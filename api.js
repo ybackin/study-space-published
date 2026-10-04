@@ -2,7 +2,9 @@ export class StudyAPI {
   constructor(config,{fetchAPI=fetch,storage=sessionStorage}={}) {
     this.url=config.supabaseUrl.replace(/\/$/,'');
     this.key=config.supabasePublishableKey;
-    this.fetchAPI=fetchAPI;
+    // Call native window.fetch as a plain function. Some browsers reject it when
+    // it is invoked as an object method with StudyAPI as the receiver.
+    this.fetchAPI=(...args)=>fetchAPI(...args);
     this.storage=storage;
     this.version=0;
     this.refreshing=null;
@@ -66,3 +68,4 @@ export class StudyAPI {
     }
   }
 }
+
