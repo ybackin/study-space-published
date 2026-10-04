@@ -58,6 +58,8 @@ function header(profile) {
   const brand=element('a','自习室','brand');brand.href='#home';top.append(brand);
   const nav=document.createElement('nav');nav.setAttribute('aria-label','主导航');
   const home=element('a','学习主页');home.href='#home';nav.append(home);
+  const privateSpace=element('a','私人空间');privateSpace.href='#private';nav.append(privateSpace);
+  const plaza=element('a','广场');plaza.href='#plaza';nav.append(plaza);
   if(profile.role==='owner') {
     const content=element('a','内容管理');content.href='#content';nav.append(content);
     const accounts=element('a','账号管理');accounts.href='#accounts';nav.append(accounts);
@@ -89,23 +91,49 @@ function contentList(items,type) {
   for(const item of items) {
     const row=element('li','','manage-row'),copy=element('div');
     copy.append(element('strong',item.title),element('p',type==='note'?(item.summary || item.date || '无摘要'):(item.description || item.url)));
+    const actions=element('div','','manage-actions');
+    if(type==='note' && item.author_id===currentProfile.id){const edit=element('a','编辑','secondary-link');edit.href='#private?edit='+item.id;actions.append(edit);}
+    if(type==='note' && item.author_id!==currentProfile.id){row.append(copy);list.append(row);continue;}
     const remove=element('button','删除','danger-button');remove.type='button';
     remove.addEventListener('click',async()=>{if(!confirm(`确定删除“${item.title}”吗？`))return;remove.disabled=true;try{if(type==='note')await api.deleteNote(item.id);else await api.deleteLink(item.id);await show();}catch(error){remove.disabled=false;alert(error.message);}});
-    row.append(copy,remove);list.append(row);
+    actions.append(remove);row.append(copy,actions);list.append(row);
   }
   return list;
 }
-async function contentView(profile,run) {
-  if(profile.role!=='owner') throw new Error('只有主账号可以管理学习内容。');
-  const content=await api.content();if(run!==revision)return;
+async function contentView(profile,run,editId='') {
+  const notes=await api.notes('private');if(run!==revision)return;
+  const content={notes,links:[]};
   document.body.className='';view.className='';view.replaceChildren(header(profile));
   const main=element('main','','content-main');
-  main.innerHTML='<div class="page-heading"><div><p class="eyebrow">CONTENT STUDIO</p><h1>内容管理<span class="title-dot">.</span></h1><p class="page-intro">直接输入 LaTeX 公式内容，系统会自动渲染并提供命令补全。</p></div><a class="secondary-link" href="#home">返回学习主页</a></div><div class="editor-grid"><section class="panel editor-panel"><div class="section-heading"><div><span class="section-number">01</span><h2>添加学习笔记</h2></div></div><form id="note-form" class="content-form note-editor-form"><label for="note-title">标题</label><input id="note-title" name="title" required maxlength="100" placeholder="例如：线性代数第一章"><div class="latex-workbench"><div class="formula-editor"><label for="note-summary">公式内容</label><textarea id="note-summary" name="summary" maxlength="500" rows="12" placeholder="直接输入：\\frac{1}{x+1} 或 \\int_0^1 x^2 dx"></textarea><div id="formula-menu" class="formula-menu" hidden></div><p class="formula-help">输入 \\fra、\\alp、\\sqrt、\\int 等命令可调出补全；↑↓ 选择，Enter / Tab 确认。</p><div class="formula-toolbar"><button type="button" data-formula="\\frac{}{}">分式</button><button type="button" data-formula="\\sqrt{}">根号</button><button type="button" data-formula="^{}">上标</button><button type="button" data-formula="_{ }">下标</button><button type="button" data-formula="\\sum_{i=1}^{n}">求和</button><button type="button" data-formula="\\int_{a}^{b}">积分</button><button type="button" data-formula="\\begin{pmatrix}  &  \\\\  &  \\end{pmatrix}">矩阵</button></div></div><div><label>实时预览</label><div id="latex-preview" class="latex-preview" aria-live="polite"></div><p id="formula-status" class="formula-status" role="status"></p></div></div><div class="form-split"><div><label for="note-date">日期或标签</label><input id="note-date" name="date" maxlength="40" placeholder="例如：今天 / 数学"></div><div><label for="note-url">相关链接（可选）</label><input id="note-url" name="url" type="url" maxlength="2000" placeholder="https://"></div></div><p class="form-status" role="status"></p><button class="auth-submit" type="submit">保存笔记</button></form><details class="link-quick-entry"><summary>添加常用链接</summary><form id="link-form" class="content-form link-quick-form"><div><label for="link-title">名称</label><input id="link-title" name="title" required maxlength="100" placeholder="例如：课程平台"></div><div><label for="link-url">网址</label><input id="link-url" name="url" type="url" required maxlength="2000" placeholder="https://"></div><div><label for="link-description">说明</label><input id="link-description" name="description" maxlength="300" placeholder="这个链接用来做什么"></div><p class="form-status" role="status"></p><button class="auth-submit" type="submit">保存链接</button></form></details></section></div><div class="library-grid"><section class="panel"><div class="section-heading"><div><h2>已有笔记</h2></div><span class="count">'+content.notes.length+' 篇</span></div><div id="manage-notes"></div></section><section class="panel"><div class="section-heading"><div><h2>已有链接</h2></div><span class="count">'+content.links.length+' 个</span></div><div id="manage-links"></div></section></div>';
-  view.append(main);document.getElementById('manage-notes').append(contentList(content.notes,'note'));document.getElementById('manage-links').append(contentList(content.links,'link'));
+  main.innerHTML='<div class="page-heading"><div><p class="eyebrow">PRIVATE SPACE</p><h1>私人空间<span class="title-dot">.</span></h1><p class="page-intro">新建笔记默认私密；需要分享时可以切换为公开。</p></div><a class="secondary-link" href="#plaza">查看广场</a></div><div class="editor-grid"><section class="panel editor-panel"><div class="section-heading"><div><span class="section-number">01</span><h2>新建笔记</h2></div></div><form id="note-form" class="content-form note-editor-form"><label for="note-title">标题</label><input id="note-title" name="title" required maxlength="100" placeholder="例如：线性代数第一章"><div class="latex-workbench"><div class="formula-editor"><label for="note-summary">正文与公式</label><textarea id="note-summary" name="summary" maxlength="5000" rows="12" placeholder="直接输入：\\frac{1}{x+1} 或 \\int_0^1 x^2 dx"></textarea><div id="formula-menu" class="formula-menu" hidden></div><p class="formula-help">输入 \\fra、\\alp、\\sqrt、\\int 等命令可调出补全；↑↓ 选择，Enter / Tab 确认。</p><div class="formula-toolbar"><button type="button" data-formula="\\frac{}{}">分式</button><button type="button" data-formula="\\sqrt{}">根号</button><button type="button" data-formula="^{}">上标</button><button type="button" data-formula="_{ }">下标</button><button type="button" data-formula="\\sum_{i=1}^{n}">求和</button><button type="button" data-formula="\\int_{a}^{b}">积分</button><button type="button" data-formula="\\begin{pmatrix}  &  \\\\  &  \\end{pmatrix}">矩阵</button></div></div><div><label>实时预览</label><div id="latex-preview" class="latex-preview" aria-live="polite"></div><p id="formula-status" class="formula-status" role="status"></p></div></div><div class="form-split"><div><label for="note-date">日期或标签</label><input id="note-date" name="date" maxlength="40" placeholder="例如：今天 / 数学"></div><div><label for="note-visibility">可见性</label><select id="note-visibility" name="visibility"><option value="private">私密（仅自己可见）</option><option value="public">公开（广场可见）</option></select></div></div><p class="form-status" role="status"></p><button class="auth-submit" type="submit">保存笔记</button></form></section></div><div class="library-grid"><section class="panel"><div class="section-heading"><div><h2>我的笔记</h2></div><span class="count">'+content.notes.length+' 篇</span></div><div id="manage-notes"></div></section></div>';
+  view.append(main);document.getElementById('manage-notes').append(contentList(content.notes,'note'));
   const bind=(id,save)=>document.getElementById(id).addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button'),status=form.querySelector('.form-status'),values=Object.fromEntries(new FormData(form));button.disabled=true;status.textContent='';try{await save(values);form.reset();status.textContent='已保存。';await show();}catch(error){status.textContent=error.message;button.disabled=false;}});
   const summary=document.getElementById('note-summary'),preview=document.getElementById('latex-preview');setupFormulaInput(summary,preview,document.getElementById('formula-menu'),document.getElementById('formula-status'));
   main.querySelectorAll('[data-formula]').forEach(button=>button.addEventListener('click',()=>{summary.focus();const start=summary.selectionStart;summary.setRangeText(button.dataset.formula,start,summary.selectionEnd,'end');summary.dispatchEvent(new Event('input'));}));
-  bind('note-form',values=>api.addNote(values));bind('link-form',values=>api.addLink(values));
+  let saveNote=values=>api.addNote(values);
+  if(editId){const rows=await api.note(editId);if(rows[0]?.author_id===profile.id){const note=rows[0];document.getElementById('note-title').value=note.title;summary.value=note.body||note.summary||'';document.getElementById('note-date').value=note.date||'';document.getElementById('note-visibility').value=note.visibility;summary.dispatchEvent(new Event('input'));saveNote=values=>api.updateNote(editId,values);main.querySelector('.section-number').textContent='02';main.querySelector('h2').textContent='编辑笔记';main.querySelector('#note-form button').textContent='保存修改';}}
+  bind('note-form',saveNote);
+}
+async function plazaView(profile,run) {
+  const notes=await api.notes('public'); if(run!==revision)return;
+  document.body.className='';view.className='';view.replaceChildren(header(profile));
+  const main=element('main','','content-main');
+  main.innerHTML='<div class="page-heading"><div><p class="eyebrow">PUBLIC PLAZA</p><h1>广场<span class="title-dot">.</span></h1><p class="page-intro">这里展示用户主动公开的学习笔记。</p></div><a class="primary-link" href="#private">写一篇笔记</a></div><section class="panel plaza-list" id="plaza-list"></section>';
+  const list=main.querySelector('#plaza-list');
+  if(!notes.length) list.append(element('p','还没有公开笔记。','manage-empty'));
+  notes.forEach(note=>{const card=element('a','','plaza-card');card.href='#note/'+note.id;card.append(element('h2',note.title),element('p',(note.body||note.summary||'').slice(0,180)),element('span',new Date(note.created_at).toLocaleString(),'note-meta'));list.append(card);});
+  view.append(main);
+}
+async function noteView(profile,run,id) {
+  const rows=await api.note(id); if(run!==revision)return;
+  if(!rows.length) throw new Error('笔记不存在或当前账号无权查看。');
+  const note=rows[0],own=note.author_id===profile.id;
+  document.body.className='';view.className='';view.replaceChildren(header(profile));
+  const main=element('main','','content-main'),article=element('article','','panel note-reader');
+  article.append(element('p',note.visibility==='public'?'公开笔记':'私密笔记','eyebrow'),element('h1',note.title),element('p',`创建于 ${new Date(note.created_at).toLocaleString()} · 更新于 ${new Date(note.updated_at).toLocaleString()}`,'note-meta'));
+  const body=element('div','','note-reader-body');try{body.innerHTML=window.katex.renderToString((note.body||note.summary||'').trim(),{displayMode:true,throwOnError:false,trust:false,strict:'ignore'});}catch{body.textContent=note.body||note.summary||'';}article.append(body);
+  if(own){const edit=element('a','编辑这篇笔记','primary-link');edit.href='#private?edit='+note.id;article.append(edit);}
+  main.append(article);view.append(main);
 }
 async function accountsView(profile,run) {
   if(profile.role!=='owner') throw new Error('只有主账号可以管理其他账号。');
@@ -125,12 +153,12 @@ async function accountsView(profile,run) {
   });
 }
 async function show() {
-  const run=++revision,path=location.hash.slice(1) || 'home';
+  const run=++revision,hash=location.hash.slice(1) || 'home',parts=hash.split('?'),path=parts[0],query=new URLSearchParams(parts[1]||'');
   if(!api.session) {if(path!=='setup' && path!=='login') {location.hash='login';return;}authView(path==='setup');return;}
   try {
     currentProfile=await api.profile();
     if(run!==revision)return;
-    if(path==='accounts') await accountsView(currentProfile,run);else if(path==='content') await contentView(currentProfile,run);else await homeView(currentProfile,run);
+    if(path==='accounts') await accountsView(currentProfile,run);else if(path==='content'||path==='private') await contentView(currentProfile,run,query.get('edit')||'');else if(path==='plaza') await plazaView(currentProfile,run);else if(path.startsWith('note/')) await noteView(currentProfile,run,path.slice(5));else await homeView(currentProfile,run);
   } catch(error) {
     if(run!==revision)return;
     api.save(null);authView(false);document.getElementById('form-message').textContent=error.message;

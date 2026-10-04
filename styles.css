@@ -32,4 +32,8 @@
   .latex-preview{min-height:180px}
   .link-quick-form{grid-template-columns:1fr}
 }
+.manage-actions{display:flex;align-items:center;gap:.45rem}
+.plaza-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:var(--line)}
+.plaza-card{display:block;background:#fff;padding:1.35rem 1.5rem;min-height:150px}.plaza-card:hover{background:#f7f9ff}.plaza-card h2{margin-bottom:.55rem}.plaza-card p{color:var(--muted);font-size:.9rem;line-height:1.65;min-height:3.1em;overflow:hidden}
+.note-reader{max-width:900px;margin:0 auto;padding:2.2rem}.note-reader h1{margin:.25rem 0 .5rem}.note-reader-body{margin:2rem 0;min-height:180px;overflow-x:auto;line-height:1.8}.note-reader-body .katex-display{margin:1.2rem 0}
 

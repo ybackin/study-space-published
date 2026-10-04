@@ -54,12 +54,18 @@ export class StudyAPI {
     return profiles[0];
   }
   async content() {
-    const [notes,links]=await Promise.all([this.request('/rest/v1/study_notes?select=id,title,summary,url,date&order=created_at.desc'),this.request('/rest/v1/study_links?select=id,title,description,url&order=created_at.desc')]);
+    const [notes,links]=await Promise.all([this.request('/rest/v1/study_notes?select=id,title,body,summary,url,date,created_at,updated_at,visibility,author_id&order=updated_at.desc'),this.request('/rest/v1/study_links?select=id,title,description,url&order=created_at.desc')]);
     return {notes,links};
   }
-  addNote({title,summary='',url='',date=''}) {
-    return this.request('/rest/v1/study_notes',{method:'POST',headers:{Prefer:'return=minimal'},body:{title:title.trim(),summary:summary.trim(),url:url.trim() || null,date:date.trim() || null}});
+  notes(scope='private') {
+    const query=scope==='public'?'visibility=eq.public':'author_id=eq.'+encodeURIComponent(this.session.user.id);
+    return this.request('/rest/v1/study_notes?select=id,title,body,summary,url,date,created_at,updated_at,visibility,author_id&'+query+'&order=updated_at.desc');
   }
+  note(id) {return this.request('/rest/v1/study_notes?id=eq.'+encodeURIComponent(id)+'&select=id,title,body,summary,url,date,created_at,updated_at,visibility,author_id');}
+  addNote({title,body='',summary='',url='',date='',visibility='private'}) {
+    return this.request('/rest/v1/study_notes',{method:'POST',headers:{Prefer:'return=representation'},body:{author_id:this.session.user.id,title:title.trim(),body:(body || summary).trim(),summary:(body || summary).trim(),url:url.trim() || null,date:date.trim() || null,visibility:visibility==='public'?'public':'private'}});
+  }
+  updateNote(id,{title,body='',url='',date='',visibility='private'}) {return this.request('/rest/v1/study_notes?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{Prefer:'return=representation'},body:{title:title.trim(),body:body.trim(),summary:body.trim(),url:url.trim() || null,date:date.trim() || null,visibility:visibility==='public'?'public':'private',updated_at:new Date().toISOString()}});}
   deleteNote(id) {return this.request('/rest/v1/study_notes?id=eq.'+encodeURIComponent(id),{method:'DELETE'});}
   addLink({title,description='',url}) {
     return this.request('/rest/v1/study_links',{method:'POST',headers:{Prefer:'return=minimal'},body:{title:title.trim(),description:description.trim(),url:url.trim()}});
