@@ -11,9 +11,6 @@
 .latex-workbench>div{width:100%}
 .latex-workbench>div+div{margin-top:1.35rem}
 .latex-preview{width:100%;min-height:220px;padding:1rem;border:1px solid #dbe3ef;border-radius:12px;background:#fbfcff;color:#24324a;overflow-x:auto;overflow-y:auto;line-height:1.7;text-align:left}
-/* Keep site typography from becoming an inherited input to KaTeX's metrics. */
-.latex-preview .katex{font-family:KaTeX_Main,"Times New Roman",serif;font-size:1.21em;font-weight:400;font-style:normal;line-height:1.2;letter-spacing:normal;word-spacing:normal;vertical-align:baseline;position:relative;transform:none;zoom:1;text-rendering:auto}
-.latex-preview .katex .katex-html{font-family:inherit;letter-spacing:normal;word-spacing:normal}
 .preview-placeholder{color:#8793a8;font-size:.92rem}
 .preview-text{display:block;white-space:pre-wrap}
 .formula-block{display:block;width:max-content;min-width:100%;margin:.5rem 0;overflow-x:visible;text-align:left}
