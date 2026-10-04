@@ -6,19 +6,35 @@ let api, currentProfile, revision=0;
 const element=(tag,text,className)=>{const node=document.createElement(tag);node.textContent=text || '';if(className)node.className=className;return node;};
 function renderFormulaPreview(target,source) {
   target.replaceChildren();
-  if(!source.trim()) { target.append(element('span','输入 $...$、$$...$$、\\(...\\) 或 \\[...\\] 公式即可实时预览。','preview-placeholder')); return; }
-  const pattern=/\\\[([\\s\\S]*?)\\\]|\\\\\(([\\s\\S]*?)\\\\\)|\\$\\$([\\s\\S]*?)\\$\\$|\\$([^$\\n]+)\\$/g;
-  let last=0,match;
-  const appendText=value=>{if(!value)return;const node=element('span',value,'preview-text');node.style.whiteSpace='pre-wrap';target.append(node);};
-  while((match=pattern.exec(source))) {
-    appendText(source.slice(last,match.index));
-    const display=Boolean(match[1]||match[3]),expr=(match[1]||match[2]||match[3]||match[4]||'').trim();
-    const holder=element(display?'div':'span','','formula-block');
-    try { holder.innerHTML=window.katex.renderToString(expr,{displayMode:display,throwOnError:false,trust:false,strict:'ignore'}); }
-    catch { holder.textContent=expr; }
-    target.append(holder); last=pattern.lastIndex;
-  }
-  appendText(source.slice(last));
+  if(!source.trim()) { target.append(element('span','直接输入公式内容，例如 \\frac{a}{b}、\\sqrt{x} 或 \\sum_{n=1}^{\\infty} n。','preview-placeholder')); return; }
+  const holder=element('div','','formula-block');
+  try { holder.innerHTML=window.katex.renderToString(source.trim(),{displayMode:true,throwOnError:true,trust:false,strict:'ignore'}); }
+  catch(error) { holder.append(element('code',error.message || '公式暂时无法解析。','formula-error')); }
+  target.append(holder);
+}
+const formulaSuggestions=[
+  ['\\alpha','希腊字母 α'],['\\beta','希腊字母 β'],['\\gamma','希腊字母 γ'],['\\theta','希腊字母 θ'],
+  ['\\frac{}{}','分式'],['\\sqrt{}','根号'],['^{}','上标'],['_{}','下标'],['\\int_{a}^{b}','积分'],
+  ['\\iint','二重积分'],['\\iiint','三重积分'],['\\sum_{i=1}^{n}','求和'],['\\lim_{x\\to 0}','极限'],
+  ['\\partial','偏导符号'],['\\begin{pmatrix}  &  \\\\  &  \\end{pmatrix}','矩阵'],['\\begin{vmatrix}  &  \\\\  &  \\end{vmatrix}','行列式'],
+  ['\\leq','小于等于'],['\\neq','不等于'],['\\to','箭头'],['\\infty','无穷']
+];
+function setupFormulaInput(input,preview,menu,status) {
+  const update=()=>{
+    renderFormulaPreview(preview,input.value);
+    const before=input.value.slice(0,input.selectionStart),match=before.match(/\\([A-Za-z]*)$/);
+    menu.replaceChildren();
+    if(!match){menu.hidden=true;return;}
+    const query=match[1].toLowerCase(),items=formulaSuggestions.filter(([command])=>command.toLowerCase().includes(query)).slice(0,8);
+    if(!items.length){menu.hidden=true;return;}
+    items.forEach(([command,label],index)=>{const option=element('button',`${command}  ${label}`,'formula-suggestion');option.type='button';option.dataset.command=command;if(index===0)option.classList.add('is-active');option.addEventListener('mousedown',event=>{event.preventDefault();insert(command);});menu.append(option);});menu.hidden=false;
+  };
+  const insert=command=>{const start=input.selectionStart,end=input.selectionEnd,before=input.value.slice(0,start),match=before.match(/\\([A-Za-z]*)$/),from=match?start-match[0].length:start;input.setRangeText(command,from,end,'end');update();input.focus();};
+  input.addEventListener('input',update);input.addEventListener('click',update);input.addEventListener('keyup',update);
+  input.addEventListener('keydown',event=>{if(menu.hidden)return;const options=[...menu.querySelectorAll('button')],active=options.findIndex(option=>option.classList.contains('is-active'));if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=(active+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach(option=>option.classList.remove('is-active'));options[next].classList.add('is-active');}else if(event.key==='Enter'||event.key==='Tab'){const option=options[active<0?0:active];if(option){event.preventDefault();insert(option.dataset.command);}}else if(event.key==='Escape'){menu.hidden=true;}});
+  document.addEventListener('click',event=>{if(!menu.contains(event.target)&&event.target!==input)menu.hidden=true;});
+  update();
+  return insert;
 }
 function authView(setup) {
   document.body.className='auth-body';
@@ -84,10 +100,11 @@ async function contentView(profile,run) {
   const content=await api.content();if(run!==revision)return;
   document.body.className='';view.className='';view.replaceChildren(header(profile));
   const main=element('main','','content-main');
-  main.innerHTML='<div class="page-heading"><div><p class="eyebrow">CONTENT STUDIO</p><h1>内容管理<span class="title-dot">.</span></h1><p class="page-intro">以笔记为中心整理学习内容，公式会在输入时即时预览。</p></div><a class="secondary-link" href="#home">返回学习主页</a></div><div class="editor-grid"><section class="panel editor-panel"><div class="section-heading"><div><span class="section-number">01</span><h2>添加学习笔记</h2></div></div><form id="note-form" class="content-form note-editor-form"><label for="note-title">标题</label><input id="note-title" name="title" required maxlength="100" placeholder="例如：线性代数第一章"><div class="latex-workbench"><div><label for="note-summary">笔记内容与公式</label><textarea id="note-summary" name="summary" maxlength="500" rows="12" placeholder="写下要点。公式可写成 $a^2+b^2=c^2$、$$\\frac{a}{b}$$ 或 \\[\\sum_{i=1}^n i\\]。"></textarea></div><div><label>实时预览</label><div id="latex-preview" class="latex-preview" aria-live="polite"></div></div></div><div class="form-split"><div><label for="note-date">日期或标签</label><input id="note-date" name="date" maxlength="40" placeholder="例如：今天 / 数学"></div><div><label for="note-url">相关链接（可选）</label><input id="note-url" name="url" type="url" maxlength="2000" placeholder="https://"></div></div><p class="form-status" role="status"></p><button class="auth-submit" type="submit">保存笔记</button></form><details class="link-quick-entry"><summary>添加常用链接</summary><form id="link-form" class="content-form link-quick-form"><div><label for="link-title">名称</label><input id="link-title" name="title" required maxlength="100" placeholder="例如：课程平台"></div><div><label for="link-url">网址</label><input id="link-url" name="url" type="url" required maxlength="2000" placeholder="https://"></div><div><label for="link-description">说明</label><input id="link-description" name="description" maxlength="300" placeholder="这个链接用来做什么"></div><p class="form-status" role="status"></p><button class="auth-submit" type="submit">保存链接</button></form></details></section></div><div class="library-grid"><section class="panel"><div class="section-heading"><div><h2>已有笔记</h2></div><span class="count">'+content.notes.length+' 篇</span></div><div id="manage-notes"></div></section><section class="panel"><div class="section-heading"><div><h2>已有链接</h2></div><span class="count">'+content.links.length+' 个</span></div><div id="manage-links"></div></section></div>';
+  main.innerHTML='<div class="page-heading"><div><p class="eyebrow">CONTENT STUDIO</p><h1>内容管理<span class="title-dot">.</span></h1><p class="page-intro">直接输入 LaTeX 公式内容，系统会自动渲染并提供命令补全。</p></div><a class="secondary-link" href="#home">返回学习主页</a></div><div class="editor-grid"><section class="panel editor-panel"><div class="section-heading"><div><span class="section-number">01</span><h2>添加学习笔记</h2></div></div><form id="note-form" class="content-form note-editor-form"><label for="note-title">标题</label><input id="note-title" name="title" required maxlength="100" placeholder="例如：线性代数第一章"><div class="latex-workbench"><div class="formula-editor"><label for="note-summary">公式内容</label><textarea id="note-summary" name="summary" maxlength="500" rows="12" placeholder="直接输入：\\frac{1}{x+1} 或 \\int_0^1 x^2 dx"></textarea><div id="formula-menu" class="formula-menu" hidden></div><p class="formula-help">输入 \\fra、\\alp、\\sqrt、\\int 等命令可调出补全；↑↓ 选择，Enter / Tab 确认。</p><div class="formula-toolbar"><button type="button" data-formula="\\frac{}{}">分式</button><button type="button" data-formula="\\sqrt{}">根号</button><button type="button" data-formula="^{}">上标</button><button type="button" data-formula="_{ }">下标</button><button type="button" data-formula="\\sum_{i=1}^{n}">求和</button><button type="button" data-formula="\\int_{a}^{b}">积分</button><button type="button" data-formula="\\begin{pmatrix}  &  \\\\  &  \\end{pmatrix}">矩阵</button></div></div><div><label>实时预览</label><div id="latex-preview" class="latex-preview" aria-live="polite"></div><p id="formula-status" class="formula-status" role="status"></p></div></div><div class="form-split"><div><label for="note-date">日期或标签</label><input id="note-date" name="date" maxlength="40" placeholder="例如：今天 / 数学"></div><div><label for="note-url">相关链接（可选）</label><input id="note-url" name="url" type="url" maxlength="2000" placeholder="https://"></div></div><p class="form-status" role="status"></p><button class="auth-submit" type="submit">保存笔记</button></form><details class="link-quick-entry"><summary>添加常用链接</summary><form id="link-form" class="content-form link-quick-form"><div><label for="link-title">名称</label><input id="link-title" name="title" required maxlength="100" placeholder="例如：课程平台"></div><div><label for="link-url">网址</label><input id="link-url" name="url" type="url" required maxlength="2000" placeholder="https://"></div><div><label for="link-description">说明</label><input id="link-description" name="description" maxlength="300" placeholder="这个链接用来做什么"></div><p class="form-status" role="status"></p><button class="auth-submit" type="submit">保存链接</button></form></details></section></div><div class="library-grid"><section class="panel"><div class="section-heading"><div><h2>已有笔记</h2></div><span class="count">'+content.notes.length+' 篇</span></div><div id="manage-notes"></div></section><section class="panel"><div class="section-heading"><div><h2>已有链接</h2></div><span class="count">'+content.links.length+' 个</span></div><div id="manage-links"></div></section></div>';
   view.append(main);document.getElementById('manage-notes').append(contentList(content.notes,'note'));document.getElementById('manage-links').append(contentList(content.links,'link'));
   const bind=(id,save)=>document.getElementById(id).addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button'),status=form.querySelector('.form-status'),values=Object.fromEntries(new FormData(form));button.disabled=true;status.textContent='';try{await save(values);form.reset();status.textContent='已保存。';await show();}catch(error){status.textContent=error.message;button.disabled=false;}});
-  const summary=document.getElementById('note-summary');renderFormulaPreview(document.getElementById('latex-preview'),summary.value);summary.addEventListener('input',()=>renderFormulaPreview(document.getElementById('latex-preview'),summary.value));
+  const summary=document.getElementById('note-summary'),preview=document.getElementById('latex-preview');setupFormulaInput(summary,preview,document.getElementById('formula-menu'),document.getElementById('formula-status'));
+  main.querySelectorAll('[data-formula]').forEach(button=>button.addEventListener('click',()=>{summary.focus();const start=summary.selectionStart;summary.setRangeText(button.dataset.formula,start,summary.selectionEnd,'end');summary.dispatchEvent(new Event('input'));}));
   bind('note-form',values=>api.addNote(values));bind('link-form',values=>api.addLink(values));
 }
 async function accountsView(profile,run) {
