@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="登录你的个人学习空间"><meta name="referrer" content="same-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://*.supabase.co; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <title>自习室 · 我的学习空间</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232451e6'/%3E%3Cpath d='M8 8h6l2 2 2-2h6v17h-6l-2 2-2-2H8z' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="auth.css">
+</head>
+<body class="auth-body">
+  <div id="site-view" class="auth-layout"><a class="auth-brand" href="#login">自习室<span>.</span></a><section class="auth-card"><p class="eyebrow">MY STUDY SPACE</p><h1>欢迎回到自习室</h1><p class="auth-intro">正在连接你的学习空间。</p><p id="initial-message" role="status"></p></section></div>
+  <template id="home-template">
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <header class="topbar">
+    <a class="brand" href="#main" aria-label="自习室首页"><span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 4h6c2 0 3 1 3 2 0-1 1-2 3-2h6v15h-6c-2 0-3 1-3 2 0-1-1-2-3-2H3z"/><path d="M12 6v15"/></svg></span><span>自习室</span></a>
+    <nav aria-label="主导航"><a href="#notes">学习笔记</a><a href="#links">常用链接</a></nav>
+    <span class="top-label">个人学习主页</span>
+  </header>
+  <main id="main">
+    <div class="page-heading"><div><p class="eyebrow">MY STUDY SPACE</p><h1>我的学习空间<span class="title-dot">.</span></h1></div><span class="heading-label">笔记 / 资源</span></div>
+    <div class="workspace">
+      <section class="notes-panel panel" id="notes" aria-labelledby="notes-title">
+        <div class="section-heading"><div><span class="section-number">01</span><h2 id="notes-title">学习笔记</h2></div><span class="count" id="notes-count">0 篇</span></div>
+        <div class="notes-list" id="notes-list"><div class="empty-note"><div class="empty-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><rect x="11" y="7" width="29" height="34" rx="3"/><path d="M17 7v34M7 15h8M7 24h8M7 33h8M23 17h10M23 24h10M23 31h6"/></svg></div><h3>第一篇笔记，从这里开始</h3><p>这里留给你的课堂笔记、解题思路和知识整理。</p><span class="empty-caption">还没有笔记</span></div></div>
+        <div class="panel-foot"><span class="small-square" aria-hidden="true"></span><span>学习笔记</span><span class="foot-right">慢慢积累</span></div>
+      </section>
+      <section class="links-panel panel" id="links" aria-labelledby="links-title">
+        <div class="section-heading"><div><span class="section-number">02</span><h2 id="links-title">常用链接</h2></div><span class="count" id="links-count">0 个</span></div>
+        <div id="links-list" class="links-list"><div class="empty-links"><span class="link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m10 13 4-4M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0M13 8l1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" transform="translate(1 0)"/></svg></span><h3>把常用资源放在手边</h3><p>课程、资料、工具。<br>之后可以把常用网站整理在这里。</p><span class="empty-caption">还没有链接</span></div></div>
+        <div class="links-bottom"><span>学习资源</span><span aria-hidden="true">⌘</span></div>
+      </section>
+    </div>
+    <footer><span>自习室 <span class="footer-divider">/</span> 我的学习空间</span><span>一页笔记，一点进步。</span></footer>
+  </main>
+  
+  
+</template>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
