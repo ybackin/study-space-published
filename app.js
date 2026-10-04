@@ -26,7 +26,10 @@ function header(profile) {
   const brand=element('a','自习室','brand');brand.href='#home';top.append(brand);
   const nav=document.createElement('nav');nav.setAttribute('aria-label','主导航');
   const home=element('a','学习主页');home.href='#home';nav.append(home);
-  if(profile.role==='owner') {const accounts=element('a','账号管理');accounts.href='#accounts';nav.append(accounts);}
+  if(profile.role==='owner') {
+    const content=element('a','内容管理');content.href='#content';nav.append(content);
+    const accounts=element('a','账号管理');accounts.href='#accounts';nav.append(accounts);
+  }
   top.append(nav);
   const menu=element('div','','account-menu');menu.append(element('span',profile.username));
   const logout=element('button','退出登录');logout.id='logout-button';logout.type='button';
@@ -40,6 +43,35 @@ async function homeView(profile,run) {
   view.replaceChildren(document.getElementById('home-template').content.cloneNode(true));
   view.querySelector('.topbar').replaceWith(header(profile));
   renderContent(content);
+  const welcome=element('section','','welcome-panel');
+  const copy=element('div','','welcome-copy');copy.append(element('p','WELCOME BACK','eyebrow'),element('h2',`你好，${profile.username}`),element('p',content.notes.length || content.links.length?'继续整理你的学习记录，常用资料都在这里。':'你的学习空间已经准备好了，先添加第一篇笔记或第一个常用链接。','welcome-text'));
+  const stats=element('div','','welcome-stats');
+  for(const [number,label] of [[content.notes.length,'学习笔记'],[content.links.length,'常用链接']]) {const card=element('div','','stat-card');card.append(element('strong',String(number)),element('span',label));stats.append(card);}
+  welcome.append(copy,stats);
+  if(profile.role==='owner') {const action=element('a','添加学习内容','primary-link');action.href='#content';welcome.append(action);}
+  view.querySelector('.page-heading').after(welcome);
+}
+function contentList(items,type) {
+  const list=element('ul','','manage-list');
+  if(!items.length) {list.append(element('li',type==='note'?'还没有笔记，使用左侧表单添加第一篇。':'还没有链接，使用左侧表单添加第一个。','manage-empty'));return list;}
+  for(const item of items) {
+    const row=element('li','','manage-row'),copy=element('div');
+    copy.append(element('strong',item.title),element('p',type==='note'?(item.summary || item.date || '无摘要'):(item.description || item.url)));
+    const remove=element('button','删除','danger-button');remove.type='button';
+    remove.addEventListener('click',async()=>{if(!confirm(`确定删除“${item.title}”吗？`))return;remove.disabled=true;try{if(type==='note')await api.deleteNote(item.id);else await api.deleteLink(item.id);await show();}catch(error){remove.disabled=false;alert(error.message);}});
+    row.append(copy,remove);list.append(row);
+  }
+  return list;
+}
+async function contentView(profile,run) {
+  if(profile.role!=='owner') throw new Error('只有主账号可以管理学习内容。');
+  const content=await api.content();if(run!==revision)return;
+  document.body.className='';view.className='';view.replaceChildren(header(profile));
+  const main=element('main','','content-main');
+  main.innerHTML='<div class="page-heading"><div><p class="eyebrow">CONTENT STUDIO</p><h1>内容管理<span class="title-dot">.</span></h1><p class="page-intro">在这里添加学习笔记和常用链接，保存后所有网站账号都能查看。</p></div><a class="secondary-link" href="#home">返回学习主页</a></div><div class="editor-grid"><section class="panel editor-panel"><div class="section-heading"><div><span class="section-number">01</span><h2>添加学习笔记</h2></div></div><form id="note-form" class="content-form"><label for="note-title">标题</label><input id="note-title" name="title" required maxlength="100" placeholder="例如：线性代数第一章"><label for="note-summary">摘要</label><textarea id="note-summary" name="summary" maxlength="500" rows="4" placeholder="写下要点、进度或解题思路"></textarea><div class="form-split"><div><label for="note-date">日期或标签</label><input id="note-date" name="date" maxlength="40" placeholder="例如：今天 / 数学"></div><div><label for="note-url">相关链接（可选）</label><input id="note-url" name="url" type="url" maxlength="2000" placeholder="https://"></div></div><p class="form-status" role="status"></p><button class="auth-submit" type="submit">保存笔记</button></form></section><section class="panel editor-panel"><div class="section-heading"><div><span class="section-number">02</span><h2>添加常用链接</h2></div></div><form id="link-form" class="content-form"><label for="link-title">名称</label><input id="link-title" name="title" required maxlength="100" placeholder="例如：课程平台"><label for="link-description">说明</label><textarea id="link-description" name="description" maxlength="300" rows="4" placeholder="这个链接用来做什么"></textarea><label for="link-url">网址</label><input id="link-url" name="url" type="url" required maxlength="2000" placeholder="https://"><p class="form-status" role="status"></p><button class="auth-submit" type="submit">保存链接</button></form></section></div><div class="library-grid"><section class="panel"><div class="section-heading"><div><h2>已有笔记</h2></div><span class="count">'+content.notes.length+' 篇</span></div><div id="manage-notes"></div></section><section class="panel"><div class="section-heading"><div><h2>已有链接</h2></div><span class="count">'+content.links.length+' 个</span></div><div id="manage-links"></div></section></div>';
+  view.append(main);document.getElementById('manage-notes').append(contentList(content.notes,'note'));document.getElementById('manage-links').append(contentList(content.links,'link'));
+  const bind=(id,save)=>document.getElementById(id).addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button'),status=form.querySelector('.form-status'),values=Object.fromEntries(new FormData(form));button.disabled=true;status.textContent='';try{await save(values);form.reset();status.textContent='已保存。';await show();}catch(error){status.textContent=error.message;button.disabled=false;}});
+  bind('note-form',values=>api.addNote(values));bind('link-form',values=>api.addLink(values));
 }
 async function accountsView(profile,run) {
   if(profile.role!=='owner') throw new Error('只有主账号可以管理其他账号。');
@@ -64,7 +96,7 @@ async function show() {
   try {
     currentProfile=await api.profile();
     if(run!==revision)return;
-    if(path==='accounts') await accountsView(currentProfile,run);else await homeView(currentProfile,run);
+    if(path==='accounts') await accountsView(currentProfile,run);else if(path==='content') await contentView(currentProfile,run);else await homeView(currentProfile,run);
   } catch(error) {
     if(run!==revision)return;
     api.save(null);authView(false);document.getElementById('form-message').textContent=error.message;
@@ -77,3 +109,4 @@ try {
   if(!config.supabaseUrl || !config.supabasePublishableKey) throw new Error();
   api=new StudyAPI(config);window.addEventListener('hashchange',show);await show();
 } catch {document.getElementById('initial-message').textContent='网站正在准备，请稍后访问。';}
+

@@ -28,17 +28,17 @@ export class StudyAPI {
     }
     return this.refreshing;
   }
-  async request(path,{method='GET',body,authenticated=true,retry=true}={}) {
+  async request(path,{method='GET',body,authenticated=true,retry=true,headers={}}={}) {
     if(authenticated && !this.session?.access_token) throw new Error('请先登录。');
     const accessToken=this.session?.access_token;
-    const response=await this.fetchAPI(this.url+path,{method,headers:{apikey:this.key,'Content-Type':'application/json',...(authenticated?{Authorization:'Bearer '+accessToken}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
+    const response=await this.fetchAPI(this.url+path,{method,headers:{apikey:this.key,'Content-Type':'application/json',...(authenticated?{Authorization:'Bearer '+accessToken}:{}),...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});
     let data;
     try {data=await response.json();} catch {data={};}
     if(response.status===401 && authenticated && retry && this.session?.refresh_token) {
       try {
         if(this.session.access_token===accessToken) await this.refresh();
       } catch {this.save(null);throw new Error('登录已过期，请重新登录。');}
-      return this.request(path,{method,body,authenticated,retry:false});
+      return this.request(path,{method,body,authenticated,retry:false,headers});
     }
     if(!response.ok) throw new Error(data.error_description || data.error || data.msg || '暂时无法完成请求，请稍后重试。');
     return data;
@@ -54,9 +54,17 @@ export class StudyAPI {
     return profiles[0];
   }
   async content() {
-    const [notes,links]=await Promise.all([this.request('/rest/v1/study_notes?select=title,summary,url,date&order=created_at.desc'),this.request('/rest/v1/study_links?select=title,description,url&order=created_at.desc')]);
+    const [notes,links]=await Promise.all([this.request('/rest/v1/study_notes?select=id,title,summary,url,date&order=created_at.desc'),this.request('/rest/v1/study_links?select=id,title,description,url&order=created_at.desc')]);
     return {notes,links};
   }
+  addNote({title,summary='',url='',date=''}) {
+    return this.request('/rest/v1/study_notes',{method:'POST',headers:{Prefer:'return=minimal'},body:{title:title.trim(),summary:summary.trim(),url:url.trim() || null,date:date.trim() || null}});
+  }
+  deleteNote(id) {return this.request('/rest/v1/study_notes?id=eq.'+encodeURIComponent(id),{method:'DELETE'});}
+  addLink({title,description='',url}) {
+    return this.request('/rest/v1/study_links',{method:'POST',headers:{Prefer:'return=minimal'},body:{title:title.trim(),description:description.trim(),url:url.trim()}});
+  }
+  deleteLink(id) {return this.request('/rest/v1/study_links?id=eq.'+encodeURIComponent(id),{method:'DELETE'});}
   accounts() {return this.request('/rest/v1/study_profiles?select=username,role&order=created_at');}
   create(username,password,setupKey) {return this.request('/functions/v1/study-accounts',{method:'POST',authenticated:!setupKey,body:{action:setupKey?'setup':'create',username,password,...(setupKey?{setupKey}:{})}});}
   async logout() {
