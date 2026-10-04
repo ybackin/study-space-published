@@ -6,12 +6,14 @@
 /* Compact content studio and KaTeX workbench */
 .content-main{max-width:1240px}
 .editor-grid{display:block}
-.note-editor-form #note-summary{min-height:280px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;line-height:1.65}
-.latex-workbench{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(280px,.92fr);gap:1rem;align-items:stretch}
-.latex-preview{min-height:280px;padding:1rem;border:1px solid #dbe3ef;border-radius:12px;background:#fbfcff;color:#24324a;overflow:auto;line-height:1.7}
+.note-editor-form #note-summary{min-height:360px;max-height:560px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;line-height:1.65}
+.latex-workbench{display:block;width:100%}
+.latex-workbench>div{width:100%}
+.latex-workbench>div+div{margin-top:1.35rem}
+.latex-preview{width:100%;min-height:220px;padding:1rem;border:1px solid #dbe3ef;border-radius:12px;background:#fbfcff;color:#24324a;overflow-x:auto;overflow-y:auto;line-height:1.7;text-align:left}
 .preview-placeholder{color:#8793a8;font-size:.92rem}
 .preview-text{display:block;white-space:pre-wrap}
-.formula-block{display:block;margin:.5rem 0;overflow-x:auto}
+.formula-block{display:block;width:max-content;min-width:100%;margin:.5rem 0;overflow-x:visible;text-align:left}
 .formula-block .katex-display{margin:.65rem 0}
 .formula-editor{position:relative}
 .formula-help{color:#8793a8;font-size:.78rem;margin-top:.45rem}
@@ -28,8 +30,8 @@
 .link-quick-form{display:grid;grid-template-columns:1fr 1.35fr 1.3fr auto;gap:.8rem;align-items:end;margin-top:1rem}
 .link-quick-form .form-status{grid-column:1/-1;margin:0}
 @media (max-width:760px){
-  .latex-workbench{grid-template-columns:1fr}
-  .latex-preview{min-height:180px}
+  .latex-workbench{display:block}
+  .latex-preview{min-height:220px}
   .link-quick-form{grid-template-columns:1fr}
 }
 .manage-actions{display:flex;align-items:center;gap:.45rem}
