@@ -71,7 +71,7 @@ export class StudyAPI {
     return this.request('/rest/v1/study_links',{method:'POST',headers:{Prefer:'return=minimal'},body:{title:title.trim(),description:description.trim(),url:url.trim()}});
   }
   deleteLink(id) {return this.request('/rest/v1/study_links?id=eq.'+encodeURIComponent(id),{method:'DELETE'});}
-  accounts() {return this.request('/rest/v1/study_profiles?select=username,role&order=created_at');}
+  accounts() {return this.request('/rest/v1/study_profiles?select=id,username,role&order=created_at');}
   create(username,password,setupKey) {return this.request('/functions/v1/study-accounts',{method:'POST',authenticated:!setupKey,body:{action:setupKey?'setup':'create',username,password,...(setupKey?{setupKey}:{})}});}
   async logout() {
     const session=this.session;

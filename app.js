@@ -115,13 +115,14 @@ async function contentView(profile,run,editId='') {
   bind('note-form',saveNote);
 }
 async function plazaView(profile,run) {
-  const notes=await api.notes('public'); if(run!==revision)return;
+  const [notes,profiles]=await Promise.all([api.notes('public'),api.accounts()]); if(run!==revision)return;
+  const names=new Map(profiles.map(item=>[item.id,item.username]));
   document.body.className='';view.className='';view.replaceChildren(header(profile));
   const main=element('main','','content-main');
   main.innerHTML='<div class="page-heading"><div><p class="eyebrow">PUBLIC PLAZA</p><h1>广场<span class="title-dot">.</span></h1><p class="page-intro">这里展示用户主动公开的学习笔记。</p></div><a class="primary-link" href="#private">写一篇笔记</a></div><section class="panel plaza-list" id="plaza-list"></section>';
   const list=main.querySelector('#plaza-list');
   if(!notes.length) list.append(element('p','还没有公开笔记。','manage-empty'));
-  notes.forEach(note=>{const card=element('a','','plaza-card');card.href='#note/'+note.id;card.append(element('h2',note.title),element('p',(note.body||note.summary||'').slice(0,180)),element('span',new Date(note.created_at).toLocaleString(),'note-meta'));list.append(card);});
+  notes.forEach(note=>{const card=element('a','','plaza-card');card.href='#note/'+note.id;card.append(element('h2',note.title),element('p',(note.body||note.summary||'').slice(0,180)),element('span',`${names.get(note.author_id)||'学习者'} · ${new Date(note.created_at).toLocaleString()}`,'note-meta'));list.append(card);});
   view.append(main);
 }
 async function noteView(profile,run,id) {
