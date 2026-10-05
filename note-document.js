@@ -9,7 +9,9 @@ export function readDocument(body='') {
     const parsed=blocks(value.source),mathNodes=parsed.flatMap(block=>block.type==='line'?block.children:[block]).filter(node=>node.type==='inlineMath'||node.type==='blockMath');
     const savedNodes=Array.isArray(value.content)?value.content.flatMap(block=>block?.type==='line'&&Array.isArray(block.children)?block.children:[block]):[];
     const nodeColors=mathNodes.flatMap(node=>{
-      const saved=savedNodes.find(item=>item?.type===node.type&&item.from===node.from&&item.to===node.to&&item.latex===node.source);
+      // A formerly display-rendered standalone formula becomes an ordinary line formula.
+      // Match its source range so existing saved formula colors survive that migration.
+      const saved=savedNodes.find(item=>item?.latex===node.source&&item.from<=node.from&&item.to>=node.to&&['inlineMath','blockMath'].includes(item.type));
       return saved&&TEXT_COLORS.includes(saved.color)&&saved.color!=='default'?[{from:node.from,to:node.to,color:saved.color}]:[];
     });
     return {source:value.source,marks:validMarks(value.marks,value.source.length),mathColors:value.version===2?nodeColors:validMarks(Array.isArray(value.mathColors)?value.mathColors:[],value.source.length)};
@@ -47,9 +49,10 @@ export function colorRange(marks,from,to,color) {
   return next.sort((a,b)=>a.from-b.from);
 }
 function mathLike(value) {
-  // Punctuation alone is prose. Only a complete mathematical expression is a block.
+  // A mathematical line remains in the normal note flow; this only chooses its inline content.
   return !/[\u3400-\u9fff]/.test(value) && (/\\[A-Za-z]+/.test(value) || /[A-Za-z0-9)]\s*[_^=<>]\s*[A-Za-z0-9({\\]/.test(value));
 }
+const displayEnvironment=/^\\begin\{(?:align|aligned|alignat|cases|dcases|rcases|pmatrix|bmatrix|vmatrix|Vmatrix|matrix|array|gather|gathered|split|equation|multline)\}/;
 const cleanInvalidSlashes=source=>source.replace(/(?<!\\)\\(?![A-Za-z\\{}\[\]()%$&#_^ ,;:!])/g,'');
 function mathRunEnd(source,start) {
   if(!/[A-Za-z]/.test(source[start]||'')&&!(source[start]==='\\'&&/[A-Za-z]/.test(source[start+1]||'')))return start;
@@ -91,7 +94,10 @@ export function blocks(source) {
       const pairs=Math.floor((j-i)/2);
       if(pairs){
         if(i>start)parts.push({source:raw.slice(start,i),from:offset+start});
-        for(let p=0;p<pairs;p++)parts.push({break:true});
+        for(let p=0;p<pairs;p++){
+          if(p>0)parts.push({source:'',from:offset+i+p*2});
+          parts.push({break:true});
+        }
         start=i+pairs*2;i=start-1;
       }
     }
@@ -99,8 +105,15 @@ export function blocks(source) {
     for(const part of parts) {
       if(part.break){result.push({type:'break'});continue;}
       const clean=cleanInvalidSlashes(part.source),trimmed=clean.trim();
-      if(trimmed&&mathLike(trimmed))result.push({type:'blockMath',source:trimmed,from:part.from,to:part.from+part.source.length});
-      else result.push({type:'line',children:inlineNodes(clean,part.from),from:part.from,to:part.from+part.source.length});
+      if(trimmed&&displayEnvironment.test(trimmed))result.push({type:'blockMath',source:trimmed,from:part.from,to:part.from+part.source.length});
+      else if(trimmed&&mathLike(trimmed)){
+        const leading=clean.indexOf(trimmed);
+        const children=[];
+        if(leading>0)children.push({type:'text',source:clean.slice(0,leading),from:part.from,to:part.from+leading});
+        children.push({type:'inlineMath',source:trimmed,from:part.from+leading,to:part.from+leading+trimmed.length});
+        if(leading+trimmed.length<clean.length)children.push({type:'text',source:clean.slice(leading+trimmed.length),from:part.from+leading+trimmed.length,to:part.from+clean.length});
+        result.push({type:'line',children,from:part.from,to:part.from+part.source.length});
+      } else result.push({type:'line',children:inlineNodes(clean,part.from),from:part.from,to:part.from+part.source.length});
     }
     result.push({type:'break'});offset+=raw.length+1;
   }
