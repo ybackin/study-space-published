@@ -36,10 +36,11 @@ function setupFormulaInput(input,preview,menu,status) {
   update();
   return insert;
 }
-function authView(setup) {
+function authView(mode) {
+  const setup=mode==='setup',signup=mode==='signup';
   document.body.className='auth-body';
   view.className='auth-layout';
-  view.innerHTML=`<a class="auth-brand" href="#login">自习室<span>.</span></a><section class="auth-card"><p class="eyebrow">MY STUDY SPACE</p><h1>${setup?'创建你的主账号':'欢迎回到自习室'}</h1><p class="auth-intro">${setup?'设置一个专属于你的用户名和密码。':'登录后查看学习笔记和常用链接。'}</p><form id="login-form">${setup?'<label for="setup-key">账号创建码</label><input id="setup-key" name="setupKey" type="password" required autocomplete="off" maxlength="100">':''}<label for="username">用户名</label><input id="username" name="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_.-]{3,32}" autocomplete="username"><label for="password">密码</label><input id="password" name="password" type="password" required minlength="8" maxlength="128" autocomplete="${setup?'new-password':'current-password'}">${setup?'<p class="field-hint">至少 8 个字符，不要求字母、数字或大小写组合。</p><label for="confirm-password">再次输入密码</label><input id="confirm-password" name="confirmPassword" type="password" required minlength="8" maxlength="128" autocomplete="new-password">':''}<p id="form-message" class="auth-message" role="status" aria-live="polite"></p><button type="submit" class="auth-submit">${setup?'创建账号并进入':'登录'}</button></form><a class="auth-help" href="${setup?'#login':'#setup'}">${setup?'已有账号？返回登录':'首次使用？创建主账号'}</a></section><p class="auth-footer">自习室 / 我的学习空间</p>`;
+  view.innerHTML=`<a class="auth-brand" href="#login">自习室<span>.</span></a><section class="auth-card"><p class="eyebrow">MY STUDY SPACE</p><h1>${setup?'创建管理员账号':signup?'创建你的账号':'欢迎回到自习室'}</h1><p class="auth-intro">${setup?'使用管理员创建码设置管理员账号。':signup?'注册后即可拥有独立的私人空间和笔记。':'登录后查看学习笔记和常用链接。'}</p><form id="login-form">${setup?'<label for="setup-key">账号创建码</label><input id="setup-key" name="setupKey" type="password" required autocomplete="off" maxlength="100">':''}<label for="username">用户名</label><input id="username" name="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_.-]{3,32}" autocomplete="username"><label for="password">密码</label><input id="password" name="password" type="password" required minlength="8" maxlength="128" autocomplete="${setup||signup?'new-password':'current-password'}">${setup||signup?'<p class="field-hint">至少 8 个字符，不要求字母、数字或大小写组合。</p><label for="confirm-password">再次输入密码</label><input id="confirm-password" name="confirmPassword" type="password" required minlength="8" maxlength="128" autocomplete="new-password">':''}<p id="form-message" class="auth-message" role="status" aria-live="polite"></p><button type="submit" class="auth-submit">${setup||signup?'创建账号并进入':'登录'}</button></form><a class="auth-help" href="${setup||signup?'#login':'#signup'}">${setup||signup?'已有账号？返回登录':'首次使用？创建新账号'}</a>${!signup&&!setup?'<a class="auth-help" href="#setup">管理员创建入口</a>':''}</section><p class="auth-footer">自习室 / 我的学习空间</p>`;
   document.getElementById('login-form').addEventListener('submit',async event=>{
     event.preventDefault();
     const form=event.currentTarget,fields=new FormData(form),button=form.querySelector('button'),message=document.getElementById('form-message');
@@ -47,6 +48,7 @@ function authView(setup) {
     button.disabled=true;message.textContent='';
     try {
       if(setup) await api.create(fields.get('username'),fields.get('password'),fields.get('setupKey'));
+      else if(signup) await api.create(fields.get('username'),fields.get('password'));
       currentProfile=await api.login(fields.get('username'),fields.get('password'));
       form.reset();location.hash='home';
     } catch(error) {message.textContent=error.message;}
@@ -115,7 +117,7 @@ async function contentView(profile,run,editId='') {
   bind('note-form',saveNote);
 }
 async function plazaView(profile,run) {
-  const [notes,profiles]=await Promise.all([api.notes('public'),api.accounts()]); if(run!==revision)return;
+  const [notes,profiles]=await Promise.all([api.notes('public'),api.profileNames()]); if(run!==revision)return;
   const names=new Map(profiles.map(item=>[item.id,item.username]));
   document.body.className='';view.className='';view.replaceChildren(header(profile));
   const main=element('main','','content-main');
@@ -150,19 +152,19 @@ async function accountsView(profile,run) {
     event.preventDefault();const form=event.currentTarget,fields=new FormData(form),button=form.querySelector('button'),message=document.getElementById('form-message');
     if(fields.get('password')!==fields.get('confirmPassword')) {message.textContent='两次输入的密码不一致。';return;}
     button.disabled=true;message.textContent='';
-    try {await api.create(fields.get('username'),fields.get('password'));form.reset();await show();} catch(error) {message.textContent=error.message;button.disabled=false;}
+    try {await api.createMember(fields.get('username'),fields.get('password'));form.reset();await show();} catch(error) {message.textContent=error.message;button.disabled=false;}
   });
 }
 async function show() {
   const run=++revision,hash=location.hash.slice(1) || 'home',parts=hash.split('?'),path=parts[0],query=new URLSearchParams(parts[1]||'');
-  if(!api.session) {if(path!=='setup' && path!=='login') {location.hash='login';return;}authView(path==='setup');return;}
+  if(!api.session) {if(!['setup','signup','login'].includes(path)) {location.hash='login';return;}authView(path==='setup'?'setup':path==='signup'?'signup':'login');return;}
   try {
     currentProfile=await api.profile();
     if(run!==revision)return;
     if(path==='accounts') await accountsView(currentProfile,run);else if(path==='content'||path==='private') await contentView(currentProfile,run,query.get('edit')||'');else if(path==='plaza') await plazaView(currentProfile,run);else if(path.startsWith('note/')) await noteView(currentProfile,run,path.slice(5));else await homeView(currentProfile,run);
   } catch(error) {
     if(run!==revision)return;
-    api.save(null);authView(false);document.getElementById('form-message').textContent=error.message;
+    api.save(null);authView('login');document.getElementById('form-message').textContent=error.message;
   }
 }
 try {
