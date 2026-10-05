@@ -12,10 +12,18 @@ function renderFormulaPreview(target,document) {
   if(!doc.source.trim()) { target.append(element('span','直接输入正文或公式，例如 \\frac{a}{b}。','preview-placeholder')); return; }
   for(const block of blocks(doc.source)) {
     if(block.type==='break'){target.append(element('div','\u00a0','preview-break'));continue;}
-    if(block.type==='text') {
-      const holder=element('div','','preview-text');
-      const boundaries=[0,block.source.length,...doc.marks.flatMap(mark=>[mark.from-block.from,mark.to-block.from])].filter(value=>value>=0&&value<=block.source.length).sort((a,b)=>a-b);
-      for(let i=1;i<boundaries.length;i++){const from=boundaries[i-1],to=boundaries[i];if(to<=from)continue;const mark=doc.marks.find(item=>item.from<=block.from+from&&item.to>=block.from+to);holder.append(element('span',block.source.slice(from,to),mark?'text-color-'+mark.color:''));}
+    if(block.type==='line') {
+      const holder=element('div','','preview-line');
+      for(const node of block.children) {
+        if(node.type==='inlineMath') {
+          const inline=element('span','','inline-formula');
+          try{inline.innerHTML=window.katex.renderToString(visibleMathSpaces(node.source),{displayMode:false,throwOnError:true,trust:false,strict:'ignore'});}
+          catch(error){inline.append(element('code',error.message||'公式暂时无法解析。','formula-error'));}
+          holder.append(inline);continue;
+        }
+        const boundaries=[0,node.source.length,...doc.marks.flatMap(mark=>[mark.from-node.from,mark.to-node.from])].filter(value=>value>=0&&value<=node.source.length).sort((a,b)=>a-b);
+        for(let i=1;i<boundaries.length;i++){const from=boundaries[i-1],to=boundaries[i];if(to<=from)continue;const mark=doc.marks.find(item=>item.from<=node.from+from&&item.to>=node.from+to);holder.append(element('span',node.source.slice(from,to),mark?'text-color-'+mark.color:''));}
+      }
       target.append(holder);continue;
     }
     const holder=element('div','','formula-block');
@@ -170,9 +178,9 @@ async function editorView(profile,run,editId='',restore=false) {
   summary.addEventListener('input',syncSource);
   const colorBar=element('div','','color-toolbar');colorBar.append(element('span','文字颜色'));
   const colorNames={default:'默认',red:'红',orange:'橙',yellow:'黄',green:'绿',cyan:'青',blue:'蓝',purple:'紫',pink:'粉',gray:'灰'};
-  for(const color of TEXT_COLORS){const button=element('button',colorNames[color],'color-choice text-color-'+color);button.type='button';button.dataset.color=color;button.title='把选中的正文文字设为'+colorNames[color];button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{const from=summary.selectionStart,to=summary.selectionEnd;if(from===to){status.textContent='先选中一段普通文字。';return;}if(blocks(doc.source).some(block=>block.type==='math'&&from<block.to&&to>block.from)){status.textContent='公式源码不能标色，请只选择普通文字。';return;}doc.marks=colorRange(doc.marks,from,to,color);record();renderFormulaPreview(preview,doc);summary.focus();summary.setSelectionRange(from,to);summary.dispatchEvent(new Event('change',{bubbles:true}));});colorBar.append(button);}
+  for(const color of TEXT_COLORS){const button=element('button',colorNames[color],'color-choice text-color-'+color);button.type='button';button.dataset.color=color;button.title='把选中的正文文字设为'+colorNames[color];button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{const from=summary.selectionStart,to=summary.selectionEnd;if(from===to){status.textContent='先选中一段普通文字。';return;}const nodes=blocks(doc.source).flatMap(block=>block.type==='line'?block.children:[block]);if(nodes.some(node=>['inlineMath','blockMath'].includes(node.type)&&from<node.to&&to>node.from)){status.textContent='公式源码不能标色，请只选择普通文字。';return;}doc.marks=colorRange(doc.marks,from,to,color);record();renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);summary.focus();summary.setSelectionRange(from,to);summary.dispatchEvent(new Event('change',{bubbles:true}));});colorBar.append(button);}
   main.querySelector('.formula-toolbar').before(colorBar);
-  summary.addEventListener('keydown',event=>{if(!(event.ctrlKey||event.metaKey)||!['z','y'].includes(event.key.toLowerCase()))return;event.preventDefault();historyIndex=Math.max(0,Math.min(historyStack.length-1,historyIndex+(event.key.toLowerCase()==='y'||event.shiftKey?1:-1)));doc={source:historyStack[historyIndex].source,marks:historyStack[historyIndex].marks.map(mark=>({...mark}))};summary.value=doc.source;renderFormulaPreview(preview,doc);summary.dispatchEvent(new Event('change',{bubbles:true}));});
+  summary.addEventListener('keydown',event=>{if(!(event.ctrlKey||event.metaKey)||!['z','y'].includes(event.key.toLowerCase()))return;event.preventDefault();historyIndex=Math.max(0,Math.min(historyStack.length-1,historyIndex+(event.key.toLowerCase()==='y'||event.shiftKey?1:-1)));doc={source:historyStack[historyIndex].source,marks:historyStack[historyIndex].marks.map(mark=>({...mark}))};summary.value=doc.source;renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);summary.dispatchEvent(new Event('change',{bubbles:true}));});
   let noteId=editId||null,editVersion=0,savedVersion=0,timer=null,saveChain=Promise.resolve(),noteStatus='draft';
   const localKey=id=>`study-draft:${profile.id}:${id||'new'}`;
   const collect=(state='draft')=>{const desired=visibilityInput.value==='public'?'public':'private',saved=state==='published'?finishedDocument(doc):doc;return {title:titleInput.value.trim()||'未命名草稿',body:writeDocument(saved),summary:saved.source,date:encodeMetadata(dateInput.value,tagPicker.get(),desired),status:state,visibility:state==='draft'?'private':desired};};
@@ -183,6 +191,9 @@ async function editorView(profile,run,editId='',restore=false) {
   const findBackup=id=>{try{return JSON.parse(localStorage.getItem(localKey(id))||'null');}catch{return null;}};
   if(editId){const rows=await api.note(editId);if(run!==revision)return;const note=rows[0];if(!note||note.author_id!==profile.id)throw new Error('笔记不存在或当前账号无权编辑。');const meta=noteMetadata(note.date,note.status);noteStatus=meta.status;titleInput.value=note.title;doc=readDocument(note.body||note.summary||'');summary.value=doc.source;historyStack=[snapshot()];dateInput.value=meta.date;tagPicker.set(meta.tags);visibilityInput.value=meta.desiredVisibility==='public'||note.visibility==='public'?'public':'private';main.querySelector('#editor-title').firstChild.textContent=meta.status==='draft'?'继续编辑草稿':'编辑笔记';const backup=findBackup(editId);if(backup?.updatedAt&&new Date(backup.updatedAt)>new Date(note.updated_at||note.created_at)){if(confirm('发现比云端更新的本地内容，是否恢复？'))applyValues(backup.values);else localStorage.removeItem(localKey(editId));}status.textContent=meta.status==='draft'?'这是尚未完成的草稿，编辑后会自动保存。':'修改后会自动保存为私密草稿；完成后可重新发布。';}
   setupFormulaInput(summary,preview,main.querySelector('#formula-menu'),main.querySelector('#formula-status'),()=>doc);
+  const syncPreviewScroll=()=>{const editable=Math.max(1,summary.scrollHeight-summary.clientHeight),rendered=Math.max(0,preview.scrollHeight-preview.clientHeight);preview.scrollTop=(summary.scrollTop/editable)*rendered;};
+  summary.addEventListener('scroll',syncPreviewScroll);
+  summary.addEventListener('input',()=>requestAnimationFrame(syncPreviewScroll));
   main.querySelectorAll('[data-formula]').forEach(button=>button.addEventListener('click',()=>{summary.focus();const start=summary.selectionStart;summary.setRangeText(button.dataset.formula,start,summary.selectionEnd,'end');summary.dispatchEvent(new Event('input'));}));
   const persistDraft=()=>{const version=editVersion,values=collect('draft');if(!titleInput.value.trim()&&!summary.value.trim())return Promise.resolve();status.textContent='正在保存草稿…';saveChain=saveChain.then(async()=>{const rows=noteId?await api.updateNote(noteId,values):await api.addNote(values);if(!rows?.length)throw new Error('草稿没有写入数据库，请检查网络后重试。');if(!noteId){noteId=rows[0].id;history.replaceState(null,'',`#editor?edit=${encodeURIComponent(noteId)}`);localStorage.removeItem(localKey(null));}noteStatus='draft';savedVersion=version;if(editVersion>savedVersion){cacheLocal();status.textContent='有新修改，继续同步…';scheduleSave();}else{clearLocal();status.textContent='草稿已保存。';}}).catch(error=>{cacheLocal();status.textContent='保存失败，内容已暂存在本机：'+error.message;});return saveChain;};
   const scheduleSave=()=>{editVersion++;cacheLocal();clearTimeout(timer);timer=setTimeout(persistDraft,1200);};
