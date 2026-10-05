@@ -10,13 +10,14 @@ function renderFormulaPreview(target,document) {
   target.replaceChildren();
   const doc=typeof document==='string'?readDocument(document):document;
   if(!doc.source.trim()) { target.append(element('span','直接输入正文或公式，例如 \\frac{a}{b}。','preview-placeholder')); return; }
+  const mathColor=node=>doc.mathColors?.find(mark=>mark.from===node.from&&mark.to===node.to)?.color;
   for(const block of blocks(doc.source)) {
     if(block.type==='break'){target.append(element('div','\u00a0','preview-break'));continue;}
     if(block.type==='line') {
       const holder=element('div','','preview-line');
       for(const node of block.children) {
         if(node.type==='inlineMath') {
-          const inline=element('span','','inline-formula');
+          const color=mathColor(node),inline=element('span','',`inline-formula${color?' text-color-'+color:''}`);
           try{inline.innerHTML=window.katex.renderToString(visibleMathSpaces(node.source),{displayMode:false,throwOnError:true,trust:false,strict:'ignore'});}
           catch(error){inline.append(element('code',error.message||'公式暂时无法解析。','formula-error'));}
           holder.append(inline);continue;
@@ -26,7 +27,7 @@ function renderFormulaPreview(target,document) {
       }
       target.append(holder);continue;
     }
-    const holder=element('div','','formula-block');
+    const color=mathColor(block),holder=element('div','',`formula-block${color?' text-color-'+color:''}`);
     try { holder.innerHTML=window.katex.renderToString(visibleMathSpaces(block.source),{displayMode:true,throwOnError:true,trust:false,strict:'ignore'}); }
     catch(error) { holder.append(element('code',error.message || '公式暂时无法解析。','formula-error')); }
     target.append(holder);
@@ -166,28 +167,43 @@ async function privateSpaceView(profile,run) {
 }
 async function editorView(profile,run,editId='',restore=false) {
   const notes=await api.myNotes();if(run!==revision)return;
-  document.body.className='';view.className='';view.replaceChildren(header(profile));
-  const main=element('main','','content-main');
+  document.body.className='editor-page';view.className='';view.replaceChildren(header(profile));
+  const main=element('main','','content-main editor-main');
   main.innerHTML='<div class="page-heading"><div><p class="eyebrow">NOTE EDITOR</p><h1 id="editor-title">新建笔记<span class="title-dot">.</span></h1><p class="page-intro">内容会自动保存为私密草稿；完成后可选择是否公开。</p></div><a class="secondary-link" href="#content">返回内容管理</a></div><section class="panel editor-panel"><form id="note-form" class="content-form note-editor-form"><label for="note-title">标题</label><input id="note-title" name="title" maxlength="100" placeholder="例如：线性代数第一章"><div class="latex-workbench"><div class="formula-editor"><label for="note-summary">正文与公式</label><textarea id="note-summary" name="summary" maxlength="5000" rows="12" placeholder="普通文字可直接输入；公式如 \\frac{1}{x+1} 或 \\int_0^1 x^2 dx"></textarea><div id="formula-menu" class="formula-menu" hidden></div><p class="formula-help">输入 \\fra、\\alp、\\sqrt、\\int 等命令可补全；↑↓ 选择，Enter / Tab 确认。</p><div class="formula-toolbar"><button type="button" data-formula="\\frac{}{}">分式</button><button type="button" data-formula="\\sqrt{}">根号</button><button type="button" data-formula="^{}">上标</button><button type="button" data-formula="_{ }">下标</button><button type="button" data-formula="\\sum_{i=1}^{n}">求和</button><button type="button" data-formula="\\int_{a}^{b}">积分</button><button type="button" data-formula="\\begin{pmatrix}  &  \\\\  &  \\end{pmatrix}">矩阵</button></div></div><div><label>实时预览</label><div id="latex-preview" class="latex-preview" aria-live="polite"></div><p id="formula-status" class="formula-status" role="status"></p></div></div><div class="tag-picker" id="tag-picker"></div><div class="form-split"><div><label for="note-date">日期</label><input id="note-date" name="date" type="date"></div><div><label for="note-visibility">完成后可见性</label><select id="note-visibility" name="visibility"><option value="private">私密</option><option value="public">公开到广场</option></select></div></div><p class="form-status" role="status">输入标题或正文后将自动保存为草稿。</p><div class="editor-actions"><button class="secondary-link" type="submit">立即保存草稿</button><button class="auth-submit" id="complete-note" type="button">完成并保存</button></div></form></section>';
   view.append(main);
   const form=main.querySelector('#note-form'),titleInput=form.elements.title,summary=form.elements.summary,dateInput=form.elements.date,visibilityInput=form.elements.visibility,status=form.querySelector('.form-status'),tagRoot=main.querySelector('#tag-picker'),tagPicker=setupTagPicker(tagRoot,notes.flatMap(note=>noteMetadata(note.date).tags)),preview=main.querySelector('#latex-preview');
-  let doc={source:'',marks:[]},historyStack=[{source:'',marks:[]}],historyIndex=0;
-  const snapshot=()=>({source:doc.source,marks:doc.marks.map(mark=>({...mark}))});
+  main.querySelector('.latex-workbench > div:last-child').classList.add('preview-pane');
+  const settings=element('details','','note-settings'),settingsBody=element('div','','settings-body'),footer=element('div','','editor-footer');
+  settings.append(element('summary','笔记设置'));settingsBody.append(tagRoot,form.querySelector('.form-split'));settings.append(settingsBody);
+  footer.append(status,form.querySelector('.editor-actions'));form.append(settings,footer);
+  const blockButton=element('button','独立公式块');blockButton.type='button';blockButton.title='把选中的公式放到独立一行';
+  blockButton.addEventListener('click',()=>{const start=summary.selectionStart,end=summary.selectionEnd,before=summary.value.slice(0,start),after=summary.value.slice(end),formula=summary.value.slice(start,end).trim()||'\\frac{}{}';summary.setRangeText((before&&!before.endsWith('\n')?'\n':'')+formula+(after&&!after.startsWith('\n')?'\n':''),start,end,'select');summary.dispatchEvent(new Event('input',{bubbles:true}));summary.focus();});
+  main.querySelector('.formula-toolbar').append(blockButton);
+  let doc={source:'',marks:[],mathColors:[]},historyStack=[{source:'',marks:[],mathColors:[]}],historyIndex=0;
+  const snapshot=()=>({source:doc.source,marks:doc.marks.map(mark=>({...mark})),mathColors:doc.mathColors.map(mark=>({...mark}))});
   const record=()=>{historyStack.splice(historyIndex+1);historyStack.push(snapshot());if(historyStack.length>200)historyStack.shift();historyIndex=historyStack.length-1;};
-  const syncSource=()=>{if(summary.value===doc.source)return;doc={source:summary.value,marks:reconcileMarks(doc.marks,doc.source,summary.value)};record();};
+  const syncSource=()=>{if(summary.value===doc.source)return;doc={source:summary.value,marks:reconcileMarks(doc.marks,doc.source,summary.value),mathColors:reconcileMarks(doc.mathColors,doc.source,summary.value)};record();};
   summary.addEventListener('input',syncSource);
-  const colorBar=element('div','','color-toolbar');colorBar.append(element('span','文字颜色'));
+  const colorBar=element('div','','color-toolbar');colorBar.append(element('span','文字 / 公式颜色'));
   const colorNames={default:'默认',red:'红',orange:'橙',yellow:'黄',green:'绿',cyan:'青',blue:'蓝',purple:'紫',pink:'粉',gray:'灰'};
-  for(const color of TEXT_COLORS){const button=element('button',colorNames[color],'color-choice text-color-'+color);button.type='button';button.dataset.color=color;button.title='把选中的正文文字设为'+colorNames[color];button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{const from=summary.selectionStart,to=summary.selectionEnd;if(from===to){status.textContent='先选中一段普通文字。';return;}const nodes=blocks(doc.source).flatMap(block=>block.type==='line'?block.children:[block]);if(nodes.some(node=>['inlineMath','blockMath'].includes(node.type)&&from<node.to&&to>node.from)){status.textContent='公式源码不能标色，请只选择普通文字。';return;}doc.marks=colorRange(doc.marks,from,to,color);record();renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);summary.focus();summary.setSelectionRange(from,to);summary.dispatchEvent(new Event('change',{bubbles:true}));});colorBar.append(button);}
+  for(const color of TEXT_COLORS){const button=element('button',colorNames[color],'color-choice text-color-'+color);button.type='button';button.dataset.color=color;button.title='把选中的正文文字设为'+colorNames[color];button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{
+    const from=summary.selectionStart,to=summary.selectionEnd,nodes=blocks(doc.source).flatMap(block=>block.type==='line'?block.children:[block]),mathNodes=nodes.filter(node=>['inlineMath','blockMath'].includes(node.type));
+    const wholeMath=mathNodes.find(node=>from===to?from>node.from&&from<node.to:from<=node.from&&to>=node.to);
+    if(wholeMath&&mathNodes.filter(node=>from<node.to&&to>node.from).length===1&&(from===to||from===wholeMath.from&&to===wholeMath.to))doc.mathColors=colorRange(doc.mathColors,wholeMath.from,wholeMath.to,color);
+    else if(from===to){status.textContent='先选中普通文字，或把光标放在公式中。';return;}
+    else if(mathNodes.some(node=>from<node.to&&to>node.from)){status.textContent='请只选择普通文字，或单独选择一条完整公式。';return;}
+    else doc.marks=colorRange(doc.marks,from,to,color);
+    record();renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);summary.focus();summary.setSelectionRange(from,to);summary.dispatchEvent(new Event('change',{bubbles:true}));
+  });colorBar.append(button);}
   main.querySelector('.formula-toolbar').before(colorBar);
-  summary.addEventListener('keydown',event=>{if(!(event.ctrlKey||event.metaKey)||!['z','y'].includes(event.key.toLowerCase()))return;event.preventDefault();historyIndex=Math.max(0,Math.min(historyStack.length-1,historyIndex+(event.key.toLowerCase()==='y'||event.shiftKey?1:-1)));doc={source:historyStack[historyIndex].source,marks:historyStack[historyIndex].marks.map(mark=>({...mark}))};summary.value=doc.source;renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);summary.dispatchEvent(new Event('change',{bubbles:true}));});
+  summary.addEventListener('keydown',event=>{if(!(event.ctrlKey||event.metaKey)||!['z','y'].includes(event.key.toLowerCase()))return;event.preventDefault();historyIndex=Math.max(0,Math.min(historyStack.length-1,historyIndex+(event.key.toLowerCase()==='y'||event.shiftKey?1:-1)));doc={source:historyStack[historyIndex].source,marks:historyStack[historyIndex].marks.map(mark=>({...mark})),mathColors:historyStack[historyIndex].mathColors.map(mark=>({...mark}))};summary.value=doc.source;renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);summary.dispatchEvent(new Event('change',{bubbles:true}));});
   let noteId=editId||null,editVersion=0,savedVersion=0,timer=null,saveChain=Promise.resolve(),noteStatus='draft';
   const localKey=id=>`study-draft:${profile.id}:${id||'new'}`;
   const collect=(state='draft')=>{const desired=visibilityInput.value==='public'?'public':'private',saved=state==='published'?finishedDocument(doc):doc;return {title:titleInput.value.trim()||'未命名草稿',body:writeDocument(saved),summary:saved.source,date:encodeMetadata(dateInput.value,tagPicker.get(),desired),status:state,visibility:state==='draft'?'private':desired};};
-  const currentValues=()=>({title:titleInput.value,summary:summary.value,marks:doc.marks,date:dateInput.value,tags:tagPicker.get(),visibility:visibilityInput.value});
+  const currentValues=()=>({title:titleInput.value,summary:summary.value,marks:doc.marks,mathColors:doc.mathColors,date:dateInput.value,tags:tagPicker.get(),visibility:visibilityInput.value});
   const cacheLocal=()=>{const values=currentValues();if(!values.title.trim()&&!values.summary.trim())return;const backup={noteId,updatedAt:new Date().toISOString(),values};try{localStorage.setItem(localKey(noteId),JSON.stringify(backup));if(noteId)localStorage.removeItem(localKey(null));}catch{}};
   const clearLocal=()=>{try{localStorage.removeItem(localKey(noteId));localStorage.removeItem(localKey(null));}catch{}};
-  const applyValues=values=>{titleInput.value=values.title||'';doc={source:values.summary||'',marks:Array.isArray(values.marks)?values.marks:[]};summary.value=doc.source;historyStack=[snapshot()];historyIndex=0;dateInput.value=values.date||'';tagPicker.set(Array.isArray(values.tags)?values.tags:[]);visibilityInput.value=values.visibility==='public'?'public':'private';renderFormulaPreview(preview,doc);};
+  const applyValues=values=>{titleInput.value=values.title||'';doc={source:values.summary||'',marks:Array.isArray(values.marks)?values.marks:[],mathColors:Array.isArray(values.mathColors)?values.mathColors:[]};summary.value=doc.source;historyStack=[snapshot()];historyIndex=0;dateInput.value=values.date||'';tagPicker.set(Array.isArray(values.tags)?values.tags:[]);visibilityInput.value=values.visibility==='public'?'public':'private';renderFormulaPreview(preview,doc);};
   const findBackup=id=>{try{return JSON.parse(localStorage.getItem(localKey(id))||'null');}catch{return null;}};
   if(editId){const rows=await api.note(editId);if(run!==revision)return;const note=rows[0];if(!note||note.author_id!==profile.id)throw new Error('笔记不存在或当前账号无权编辑。');const meta=noteMetadata(note.date,note.status);noteStatus=meta.status;titleInput.value=note.title;doc=readDocument(note.body||note.summary||'');summary.value=doc.source;historyStack=[snapshot()];dateInput.value=meta.date;tagPicker.set(meta.tags);visibilityInput.value=meta.desiredVisibility==='public'||note.visibility==='public'?'public':'private';main.querySelector('#editor-title').firstChild.textContent=meta.status==='draft'?'继续编辑草稿':'编辑笔记';const backup=findBackup(editId);if(backup?.updatedAt&&new Date(backup.updatedAt)>new Date(note.updated_at||note.created_at)){if(confirm('发现比云端更新的本地内容，是否恢复？'))applyValues(backup.values);else localStorage.removeItem(localKey(editId));}status.textContent=meta.status==='draft'?'这是尚未完成的草稿，编辑后会自动保存。':'修改后会自动保存为私密草稿；完成后可重新发布。';}
   setupFormulaInput(summary,preview,main.querySelector('#formula-menu'),main.querySelector('#formula-status'),()=>doc);
