@@ -1,7 +1,7 @@
 import { StudyAPI } from './api.js';
 import { renderContent } from './content-renderer.js';
 import { commandToken, noteMetadata, encodeMetadata, setupTagPicker } from './editor-helpers.js';
-import { readDocument, writeDocument, reconcileMarks, colorRange, blocks, visibleMathSpaces, finishedDocument, TEXT_COLORS } from './note-document.js';
+import { readDocument, writeDocument, reconcileMarks, colorRange, blocks, documentBlocks, visibleMathSpaces, finishedDocument, TEXT_COLORS } from './note-document.js';
 
 const view=document.getElementById('site-view');
 let api, currentProfile, revision=0, activeDraftBackup=null;
@@ -10,25 +10,26 @@ function renderFormulaPreview(target,document) {
   target.replaceChildren();
   const doc=typeof document==='string'?readDocument(document):document;
   if(!doc.source.trim()) { target.append(element('span','直接输入正文或公式，例如 \\frac{a}{b}。','preview-placeholder')); return; }
-  const mathColor=node=>doc.mathColors?.find(mark=>mark.from===node.from&&mark.to===node.to)?.color;
-  for(const block of blocks(doc.source)) {
+  for(const block of documentBlocks(doc)) {
     if(block.type==='break'){target.append(element('div','\u00a0','preview-break'));continue;}
     if(block.type==='line') {
       const holder=element('div','','preview-line');
       for(const node of block.children) {
         if(node.type==='inlineMath') {
-          const color=mathColor(node),inline=element('span','',`inline-formula${color?' text-color-'+color:''}`);
-          try{inline.innerHTML=window.katex.renderToString(visibleMathSpaces(node.source),{displayMode:false,throwOnError:true,trust:false,strict:'ignore'});}
+          const color=node.color,inline=element('span','',`inline-formula${color?' text-color-'+color:''}`);
+          inline.dataset.from=String(node.from);inline.dataset.to=String(node.to);inline.tabIndex=0;inline.setAttribute('role','button');inline.setAttribute('aria-label','选择行内公式以设置颜色');
+          try{inline.innerHTML=window.katex.renderToString(visibleMathSpaces(node.latex),{displayMode:false,throwOnError:true,trust:false,strict:'ignore'});}
           catch(error){inline.append(element('code',error.message||'公式暂时无法解析。','formula-error'));}
           holder.append(inline);continue;
         }
-        const boundaries=[0,node.source.length,...doc.marks.flatMap(mark=>[mark.from-node.from,mark.to-node.from])].filter(value=>value>=0&&value<=node.source.length).sort((a,b)=>a-b);
-        for(let i=1;i<boundaries.length;i++){const from=boundaries[i-1],to=boundaries[i];if(to<=from)continue;const mark=doc.marks.find(item=>item.from<=node.from+from&&item.to>=node.from+to);holder.append(element('span',node.source.slice(from,to),mark?'text-color-'+mark.color:''));}
+        const boundaries=[0,node.text.length,...doc.marks.flatMap(mark=>[mark.from-node.from,mark.to-node.from])].filter(value=>value>=0&&value<=node.text.length).sort((a,b)=>a-b);
+        for(let i=1;i<boundaries.length;i++){const from=boundaries[i-1],to=boundaries[i];if(to<=from)continue;const mark=doc.marks.find(item=>item.from<=node.from+from&&item.to>=node.from+to);holder.append(element('span',node.text.slice(from,to),mark?'text-color-'+mark.color:''));}
       }
       target.append(holder);continue;
     }
-    const color=mathColor(block),holder=element('div','',`formula-block${color?' text-color-'+color:''}`);
-    try { holder.innerHTML=window.katex.renderToString(visibleMathSpaces(block.source),{displayMode:true,throwOnError:true,trust:false,strict:'ignore'}); }
+    const color=block.color,holder=element('div','',`formula-block${color?' text-color-'+color:''}`);
+    holder.dataset.from=String(block.from);holder.dataset.to=String(block.to);holder.tabIndex=0;holder.setAttribute('role','button');holder.setAttribute('aria-label','选择独立公式以设置颜色');
+    try { holder.innerHTML=window.katex.renderToString(visibleMathSpaces(block.latex),{displayMode:true,throwOnError:true,trust:false,strict:'ignore'}); }
     catch(error) { holder.append(element('code',error.message || '公式暂时无法解析。','formula-error')); }
     target.append(holder);
   }
@@ -179,21 +180,33 @@ async function editorView(profile,run,editId='',restore=false) {
   const blockButton=element('button','独立公式块');blockButton.type='button';blockButton.title='把选中的公式放到独立一行';
   blockButton.addEventListener('click',()=>{const start=summary.selectionStart,end=summary.selectionEnd,before=summary.value.slice(0,start),after=summary.value.slice(end),formula=summary.value.slice(start,end).trim()||'\\frac{}{}';summary.setRangeText((before&&!before.endsWith('\n')?'\n':'')+formula+(after&&!after.startsWith('\n')?'\n':''),start,end,'select');summary.dispatchEvent(new Event('input',{bubbles:true}));summary.focus();});
   main.querySelector('.formula-toolbar').append(blockButton);
-  let doc={source:'',marks:[],mathColors:[]},historyStack=[{source:'',marks:[],mathColors:[]}],historyIndex=0;
+  let doc={source:'',marks:[],mathColors:[]},historyStack=[{source:'',marks:[],mathColors:[]}],historyIndex=0,selectedMath=null;
   const snapshot=()=>({source:doc.source,marks:doc.marks.map(mark=>({...mark})),mathColors:doc.mathColors.map(mark=>({...mark}))});
   const record=()=>{historyStack.splice(historyIndex+1);historyStack.push(snapshot());if(historyStack.length>200)historyStack.shift();historyIndex=historyStack.length-1;};
-  const syncSource=()=>{if(summary.value===doc.source)return;doc={source:summary.value,marks:reconcileMarks(doc.marks,doc.source,summary.value),mathColors:reconcileMarks(doc.mathColors,doc.source,summary.value)};record();};
+  const clearMathSelection=()=>{selectedMath=null;preview.querySelectorAll('.formula-selected').forEach(node=>node.classList.remove('formula-selected'));};
+  const selectMath=target=>{const node=target?.closest?.('.inline-formula,.formula-block');if(!node||!preview.contains(node))return;clearMathSelection();selectedMath={from:Number(node.dataset.from),to:Number(node.dataset.to)};node.classList.add('formula-selected');};
+  preview.addEventListener('click',event=>selectMath(event.target));
+  preview.addEventListener('focusin',event=>selectMath(event.target));
+  preview.addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)&&event.target.closest('.inline-formula,.formula-block')){event.preventDefault();selectMath(event.target);}});
+  const selectedPreviewMath=()=>{
+    const selection=window.getSelection();if(!selection?.rangeCount||selection.isCollapsed)return null;
+    const range=selection.getRangeAt(0),nodes=[...preview.querySelectorAll('.inline-formula,.formula-block')].filter(node=>range.intersectsNode(node));
+    return nodes.length===1?{from:Number(nodes[0].dataset.from),to:Number(nodes[0].dataset.to)}:null;
+  };
+  summary.addEventListener('focus',clearMathSelection);
+  const syncSource=()=>{if(summary.value===doc.source)return;clearMathSelection();doc={source:summary.value,marks:reconcileMarks(doc.marks,doc.source,summary.value),mathColors:reconcileMarks(doc.mathColors,doc.source,summary.value)};record();};
   summary.addEventListener('input',syncSource);
   const colorBar=element('div','','color-toolbar');colorBar.append(element('span','文字 / 公式颜色'));
   const colorNames={default:'默认',red:'红',orange:'橙',yellow:'黄',green:'绿',cyan:'青',blue:'蓝',purple:'紫',pink:'粉',gray:'灰'};
   for(const color of TEXT_COLORS){const button=element('button',colorNames[color],'color-choice text-color-'+color);button.type='button';button.dataset.color=color;button.title='把选中的正文文字设为'+colorNames[color];button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{
     const from=summary.selectionStart,to=summary.selectionEnd,nodes=blocks(doc.source).flatMap(block=>block.type==='line'?block.children:[block]),mathNodes=nodes.filter(node=>['inlineMath','blockMath'].includes(node.type));
-    const wholeMath=mathNodes.find(node=>from===to?from>node.from&&from<node.to:from<=node.from&&to>=node.to);
-    if(wholeMath&&mathNodes.filter(node=>from<node.to&&to>node.from).length===1&&(from===to||from===wholeMath.from&&to===wholeMath.to))doc.mathColors=colorRange(doc.mathColors,wholeMath.from,wholeMath.to,color);
+    const previewMath=selectedMath||selectedPreviewMath();
+    const wholeMath=previewMath?mathNodes.find(node=>node.from===previewMath.from&&node.to===previewMath.to):mathNodes.find(node=>from===to?from>=node.from&&from<node.to:from<=node.from&&to>=node.to);
+    if(wholeMath&&(previewMath||mathNodes.filter(node=>from<node.to&&to>node.from).length===1&&(from===to||from===wholeMath.from&&to===wholeMath.to)))doc.mathColors=colorRange(doc.mathColors,wholeMath.from,wholeMath.to,color);
     else if(from===to){status.textContent='先选中普通文字，或把光标放在公式中。';return;}
     else if(mathNodes.some(node=>from<node.to&&to>node.from)){status.textContent='请只选择普通文字，或单独选择一条完整公式。';return;}
     else doc.marks=colorRange(doc.marks,from,to,color);
-    record();renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);summary.focus();summary.setSelectionRange(from,to);summary.dispatchEvent(new Event('change',{bubbles:true}));
+    record();renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);clearMathSelection();summary.focus();summary.setSelectionRange(from,to);summary.dispatchEvent(new Event('change',{bubbles:true}));
   });colorBar.append(button);}
   main.querySelector('.formula-toolbar').before(colorBar);
   summary.addEventListener('keydown',event=>{if(!(event.ctrlKey||event.metaKey)||!['z','y'].includes(event.key.toLowerCase()))return;event.preventDefault();historyIndex=Math.max(0,Math.min(historyStack.length-1,historyIndex+(event.key.toLowerCase()==='y'||event.shiftKey?1:-1)));doc={source:historyStack[historyIndex].source,marks:historyStack[historyIndex].marks.map(mark=>({...mark})),mathColors:historyStack[historyIndex].mathColors.map(mark=>({...mark}))};summary.value=doc.source;renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);summary.dispatchEvent(new Event('change',{bubbles:true}));});
