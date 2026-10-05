@@ -1,5 +1,6 @@
 import { StudyAPI } from './api.js';
 import { renderContent } from './content-renderer.js';
+import { commandToken, noteMetadata, encodeMetadata, setupTagPicker } from './editor-helpers.js';
 
 const view=document.getElementById('site-view');
 let api, currentProfile, revision=0;
@@ -17,22 +18,28 @@ const formulaSuggestions=[
   ['\\frac{}{}','分式'],['\\sqrt{}','根号'],['^{}','上标'],['_{}','下标'],['\\int_{a}^{b}','积分'],
   ['\\iint','二重积分'],['\\iiint','三重积分'],['\\sum_{i=1}^{n}','求和'],['\\lim_{x\\to 0}','极限'],
   ['\\partial','偏导符号'],['\\begin{pmatrix}  &  \\\\  &  \\end{pmatrix}','矩阵'],['\\begin{vmatrix}  &  \\\\  &  \\end{vmatrix}','行列式'],
+  ['\\end{pmatrix}','结束矩阵'],['\\end{aligned}','结束对齐环境'],
   ['\\leq','小于等于'],['\\neq','不等于'],['\\to','箭头'],['\\infty','无穷']
 ];
 function setupFormulaInput(input,preview,menu,status) {
+  let renderedSource;
+  const close=()=>{menu.hidden=true;input.setAttribute('aria-expanded','false');};
+  input.setAttribute('aria-controls',menu.id);
   const update=()=>{
-    renderFormulaPreview(preview,input.value);
-    const before=input.value.slice(0,input.selectionStart),match=before.match(/\\([A-Za-z]*)$/);
+    if(renderedSource!==input.value){renderFormulaPreview(preview,input.value);renderedSource=input.value;}
+    const token=commandToken(input.value,input.selectionStart);
     menu.replaceChildren();
-    if(!match){menu.hidden=true;return;}
-    const query=match[1].toLowerCase(),items=formulaSuggestions.filter(([command])=>command.toLowerCase().includes(query)).slice(0,8);
-    if(!items.length){menu.hidden=true;return;}
-    items.forEach(([command,label],index)=>{const option=element('button',`${command}  ${label}`,'formula-suggestion');option.type='button';option.dataset.command=command;if(index===0)option.classList.add('is-active');option.addEventListener('mousedown',event=>{event.preventDefault();insert(command);});menu.append(option);});menu.hidden=false;
+    if(!token || input.selectionStart!==input.selectionEnd){close();return;}
+    const items=formulaSuggestions.filter(([command])=>command.toLowerCase().startsWith('\\'+token.query)).slice(0,8);
+    if(!items.length){close();return;}
+    items.forEach(([command,label],index)=>{const option=element('button',`${command}  ${label}`,'formula-suggestion');option.type='button';option.dataset.command=command;if(index===0)option.classList.add('is-active');option.addEventListener('mousedown',event=>event.preventDefault());option.addEventListener('click',()=>insert(command));menu.append(option);});menu.hidden=false;input.setAttribute('aria-expanded','true');
   };
-  const insert=command=>{const start=input.selectionStart,end=input.selectionEnd,before=input.value.slice(0,start),match=before.match(/\\([A-Za-z]*)$/),from=match?start-match[0].length:start;input.setRangeText(command,from,end,'end');update();input.focus();};
-  input.addEventListener('input',update);input.addEventListener('click',update);input.addEventListener('keyup',update);
-  input.addEventListener('keydown',event=>{if(menu.hidden)return;const options=[...menu.querySelectorAll('button')],active=options.findIndex(option=>option.classList.contains('is-active'));if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=(active+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach(option=>option.classList.remove('is-active'));options[next].classList.add('is-active');}else if(event.key==='Enter'||event.key==='Tab'){const option=options[active<0?0:active];if(option){event.preventDefault();insert(option.dataset.command);}}else if(event.key==='Escape'){menu.hidden=true;}});
-  document.addEventListener('click',event=>{if(!menu.contains(event.target)&&event.target!==input)menu.hidden=true;});
+  const insert=command=>{const token=commandToken(input.value,input.selectionStart);input.setRangeText(command,token?token.from:input.selectionStart,input.selectionEnd,'end');update();close();input.focus();};
+  input.addEventListener('input',event=>{if(!event.isComposing)update();});input.addEventListener('compositionend',update);input.addEventListener('click',update);
+  input.addEventListener('keyup',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key))update();});
+  input.addEventListener('keydown',event=>{if(menu.hidden)return;const options=[...menu.querySelectorAll('button')],active=options.findIndex(option=>option.classList.contains('is-active'));if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=(active+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach(option=>option.classList.remove('is-active'));options[next].classList.add('is-active');}else if(event.key==='Enter'||event.key==='Tab'){const option=options[active<0?0:active];if(option){event.preventDefault();insert(option.dataset.command);}}else if(event.key==='Escape'){close();}});
+  input.form.addEventListener('focusout',event=>{if(!menu.contains(event.relatedTarget)&&event.relatedTarget!==input)close();});
+  input.form.addEventListener('reset',()=>queueMicrotask(()=>{update();close();}));
   update();
   return insert;
 }
@@ -78,7 +85,7 @@ async function homeView(profile,run) {
   document.body.className='';view.className='';
   view.replaceChildren(document.getElementById('home-template').content.cloneNode(true));
   view.querySelector('.topbar').replaceWith(header(profile));
-  renderContent(content);
+  renderContent({...content,notes:content.notes.map(note=>{const meta=noteMetadata(note.date);return {...note,date:[meta.date,...meta.tags].filter(Boolean).join(' · ')};})});
   const welcome=element('section','','welcome-panel');
   const copy=element('div','','welcome-copy');copy.append(element('p','WELCOME BACK','eyebrow'),element('h2',`你好，${profile.username}`),element('p',content.notes.length || content.links.length?'继续整理你的学习记录，常用资料都在这里。':'你的学习空间已经准备好了，先添加第一篇笔记或第一个常用链接。','welcome-text'));
   const stats=element('div','','welcome-stats');
@@ -92,7 +99,8 @@ function contentList(items,type) {
   if(!items.length) {list.append(element('li',type==='note'?'还没有笔记，使用左侧表单添加第一篇。':'还没有链接，使用左侧表单添加第一个。','manage-empty'));return list;}
   for(const item of items) {
     const row=element('li','','manage-row'),copy=element('div');
-    copy.append(element('strong',item.title),element('p',type==='note'?(item.summary || item.date || '无摘要'):(item.description || item.url)));
+    copy.append(element('strong',item.title),element('p',type==='note'?(item.summary || '无摘要'):(item.description || item.url)));
+    if(type==='note'){const meta=noteMetadata(item.date),metadata=[meta.date,...meta.tags].filter(Boolean).join(' · ');if(metadata)copy.append(element('span',metadata,'note-meta'));}
     const actions=element('div','','manage-actions');
     if(type==='note' && item.author_id===currentProfile.id){const edit=element('a','编辑','secondary-link');edit.href='#private?edit='+item.id;actions.append(edit);}
     if(type==='note' && item.author_id!==currentProfile.id){row.append(copy);list.append(row);continue;}
@@ -109,6 +117,12 @@ async function contentView(profile,run,editId='') {
   const main=element('main','','content-main');
   main.innerHTML='<div class="page-heading"><div><p class="eyebrow">PRIVATE SPACE</p><h1>私人空间<span class="title-dot">.</span></h1><p class="page-intro">新建笔记默认私密；需要分享时可以切换为公开。</p></div><a class="secondary-link" href="#plaza">查看广场</a></div><div class="editor-grid"><section class="panel editor-panel"><div class="section-heading"><div><span class="section-number">01</span><h2>新建笔记</h2></div></div><form id="note-form" class="content-form note-editor-form"><label for="note-title">标题</label><input id="note-title" name="title" required maxlength="100" placeholder="例如：线性代数第一章"><div class="latex-workbench"><div class="formula-editor"><label for="note-summary">正文与公式</label><textarea id="note-summary" name="summary" maxlength="5000" rows="12" placeholder="直接输入：\\frac{1}{x+1} 或 \\int_0^1 x^2 dx"></textarea><div id="formula-menu" class="formula-menu" hidden></div><p class="formula-help">输入 \\fra、\\alp、\\sqrt、\\int 等命令可调出补全；↑↓ 选择，Enter / Tab 确认。</p><div class="formula-toolbar"><button type="button" data-formula="\\frac{}{}">分式</button><button type="button" data-formula="\\sqrt{}">根号</button><button type="button" data-formula="^{}">上标</button><button type="button" data-formula="_{ }">下标</button><button type="button" data-formula="\\sum_{i=1}^{n}">求和</button><button type="button" data-formula="\\int_{a}^{b}">积分</button><button type="button" data-formula="\\begin{pmatrix}  &  \\\\  &  \\end{pmatrix}">矩阵</button></div></div><div><label>实时预览</label><div id="latex-preview" class="latex-preview" aria-live="polite"></div><p id="formula-status" class="formula-status" role="status"></p></div></div><div class="form-split"><div><label for="note-date">日期或标签</label><input id="note-date" name="date" maxlength="40" placeholder="例如：今天 / 数学"></div><div><label for="note-visibility">可见性</label><select id="note-visibility" name="visibility"><option value="private">私密（仅自己可见）</option><option value="public">公开（广场可见）</option></select></div></div><p class="form-status" role="status"></p><button class="auth-submit" type="submit">保存笔记</button></form></section></div><div class="library-grid"><section class="panel"><div class="section-heading"><div><h2>我的笔记</h2></div><div class="section-heading-actions"><button type="button" class="secondary-link new-note-button" id="new-note-button">+ 新建笔记</button><span class="count">'+content.notes.length+' 篇</span></div></div><div id="manage-notes"></div></section></div>';
   view.append(main);document.getElementById('manage-notes').append(contentList(content.notes,'note'));
+  const dateInput=document.getElementById('note-date');
+  dateInput.type='date';dateInput.removeAttribute('maxlength');dateInput.removeAttribute('placeholder');
+  main.querySelector('label[for="note-date"]').textContent='日期';
+  const tagRoot=element('div','','tag-picker');
+  main.querySelector('.form-split').before(tagRoot);
+  const tagPicker=setupTagPicker(tagRoot,notes.filter(note=>note.author_id===profile.id).flatMap(note=>noteMetadata(note.date).tags));
   document.getElementById('new-note-button').addEventListener('click',()=>{
     if(editId) { location.hash='private'; return; }
     const form=document.getElementById('note-form');
@@ -117,11 +131,11 @@ async function contentView(profile,run,editId='') {
     form.scrollIntoView({behavior:'smooth',block:'start'});
     document.getElementById('note-title').focus();
   });
-  const bind=(id,save)=>document.getElementById(id).addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button'),status=form.querySelector('.form-status'),values=Object.fromEntries(new FormData(form));button.disabled=true;status.textContent='';try{await save(values);form.reset();status.textContent='已保存。';await show();}catch(error){status.textContent=error.message;button.disabled=false;}});
+  const bind=(id,save)=>document.getElementById(id).addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]'),status=form.querySelector('.form-status'),values=Object.fromEntries(new FormData(form));values.date=encodeMetadata(values.date,tagPicker.get());values.body=values.summary;button.disabled=true;status.textContent='正在保存…';try{await save(values);form.reset();status.textContent='已保存。';await show();}catch(error){status.textContent=error.message;button.disabled=false;}});
   const summary=document.getElementById('note-summary'),preview=document.getElementById('latex-preview');setupFormulaInput(summary,preview,document.getElementById('formula-menu'),document.getElementById('formula-status'));
   main.querySelectorAll('[data-formula]').forEach(button=>button.addEventListener('click',()=>{summary.focus();const start=summary.selectionStart;summary.setRangeText(button.dataset.formula,start,summary.selectionEnd,'end');summary.dispatchEvent(new Event('input'));}));
   let saveNote=values=>api.addNote(values);
-  if(editId){const rows=await api.note(editId);if(rows[0]?.author_id===profile.id){const note=rows[0];document.getElementById('note-title').value=note.title;summary.value=note.body||note.summary||'';document.getElementById('note-date').value=note.date||'';document.getElementById('note-visibility').value=note.visibility;summary.dispatchEvent(new Event('input'));saveNote=values=>api.updateNote(editId,values);main.querySelector('.section-number').textContent='02';main.querySelector('h2').textContent='编辑笔记';main.querySelector('#note-form button').textContent='保存修改';}}
+  if(editId){const rows=await api.note(editId);if(rows[0]?.author_id===profile.id){const note=rows[0];document.getElementById('note-title').value=note.title;summary.value=note.body||note.summary||'';const metadata=noteMetadata(note.date);dateInput.value=metadata.date;tagPicker.set(metadata.tags);document.getElementById('note-visibility').value=note.visibility;summary.dispatchEvent(new Event('input'));saveNote=values=>api.updateNote(editId,values);main.querySelector('.section-number').textContent='02';main.querySelector('h2').textContent='编辑笔记';main.querySelector('#note-form button[type="submit"]').textContent='保存修改';}}
   bind('note-form',saveNote);
 }
 async function plazaView(profile,run) {
