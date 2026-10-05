@@ -69,6 +69,7 @@ main { width: min(100% - 3rem, 1180px); margin: 0 auto; padding: 3.2rem 0 2rem; 
 .panel { overflow: hidden; background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); scroll-margin-top: 2rem; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.45rem; border-bottom: 1px solid var(--line-soft); }
 .section-heading > div { display: flex; align-items: center; gap: .65rem; }
+.section-heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: .65rem; }
 .section-number { color: var(--blue); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .7rem; font-weight: 650; }
 .count { padding: .18rem .5rem; border-radius: 6px; background: var(--surface-strong); color: var(--muted); font-size: .75rem; white-space: nowrap; }
 .notes-list { min-height: 300px; }
@@ -112,6 +113,7 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .primary-link:hover { background: var(--blue); }
 .secondary-link { border: 1px solid var(--line); background: var(--surface-strong); color: var(--text-soft); }
 .secondary-link:hover { border-color: #3b4657; background: #28303d; color: var(--text); }
+.new-note-button { cursor: pointer; }
 
 .editor-grid { display: block; }
 .library-grid { display: grid; grid-template-columns: 1fr; gap: 1.25rem; margin-top: 1.25rem; }
@@ -192,7 +194,8 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
   .welcome-panel .primary-link { grid-column: auto; justify-self: start; }
   .welcome-stats { width: 100%; }
   .stat-card { flex: 1; min-width: 0; }
-  .section-heading { padding: 1.1rem 1.15rem; }
+  .section-heading { align-items: flex-start; flex-wrap: wrap; padding: 1.1rem 1.15rem; }
+  .section-heading-actions { margin-left: auto; }
   .content-form { padding: 1.2rem 1.15rem 1.35rem; }
   .note-editor-form #note-summary { min-height: 300px; }
   .latex-preview { min-height: 220px; }
@@ -203,6 +206,10 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
   .note-reader { padding: 1.35rem; }
   .note-editor-form > .auth-submit { width: 100%; }
   footer { flex-wrap: wrap; margin-top: 2rem; }
+}
+@media (max-width: 480px) {
+  .section-heading-actions { width: 100%; justify-content: space-between; }
+  .new-note-button { flex: 1; }
 }
 @media (max-width: 380px) { nav { gap: .75rem; font-size: .8rem; } .brand { font-size: 1rem; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition-duration: .01ms !important; } }
