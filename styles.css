@@ -161,8 +161,10 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .latex-preview { width: 100%; height: min(40dvh, 400px); min-height: 220px; max-height: 400px; overflow: auto; padding: 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-strong); color: var(--text); font-size: 19px; line-height: 1.95; text-align: left; }
 .preview-placeholder { color: var(--muted-dim); font-size: .86rem; }
 .preview-line { display: block; min-height: 1.95em; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.95; }
-.inline-formula { display: inline; white-space: normal; vertical-align: baseline; }
+.inline-formula { display: inline-block; white-space: normal; vertical-align: baseline; }
 .formula-block { display: block; width: 100%; margin: 1.2rem 0; overflow-x: auto; text-align: center; }
+.inline-formula, .formula-block { cursor: pointer; border-radius: 3px; }
+.formula-selected, .inline-formula:focus-visible, .formula-block:focus-visible { outline: 1px solid var(--blue); outline-offset: 2px; }
 .formula-block .katex-display { margin: .65rem 0; }
 .formula-editor { position: relative; }
 .formula-help { margin-top: .45rem; color: var(--muted-dim); font-size: .76rem; }
