@@ -158,14 +158,14 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .latex-workbench { display: block; width: 100%; }
 .latex-workbench > div { width: 100%; }
 .latex-workbench > div + div { margin-top: 1.25rem; }
-.latex-preview { width: 100%; height: min(40dvh, 400px); min-height: 220px; max-height: 400px; overflow: auto; padding: 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-strong); color: var(--text); font-size: 19px; line-height: 1.95; text-align: left; }
+.latex-preview { width: 100%; height: min(45dvh, 480px); min-height: 220px; max-height: 480px; overflow-y: auto; overflow-x: auto; padding: .8rem 1rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-strong); color: var(--text); font-size: 18px; line-height: 1.72; text-align: left; }
 .preview-placeholder { color: var(--muted-dim); font-size: .86rem; }
-.preview-line { display: block; min-height: 1.95em; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.95; }
+.preview-line { display: block; min-height: 1.72em; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.72; }
 .inline-formula { display: inline-block; white-space: normal; vertical-align: baseline; }
-.formula-block { display: block; width: 100%; margin: 1.2rem 0; overflow-x: auto; text-align: center; }
+.formula-block { display: block; width: 100%; margin: .35em 0; overflow-x: auto; text-align: center; }
 .inline-formula, .formula-block { cursor: pointer; border-radius: 3px; }
 .formula-selected, .inline-formula:focus-visible, .formula-block:focus-visible { outline: 1px solid var(--blue); outline-offset: 2px; }
-.formula-block .katex-display { margin: .65rem 0; }
+.formula-block .katex-display { margin: 0; }
 .formula-editor { position: relative; }
 .formula-help { margin-top: .45rem; color: var(--muted-dim); font-size: .76rem; }
 .formula-status { min-height: 1.2rem; margin-top: .45rem; color: var(--danger); font-size: .78rem; }
@@ -175,7 +175,7 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .formula-suggestion:hover, .formula-suggestion.is-active { background: #2a3445; color: var(--blue-hover); }
 .formula-suggestion { white-space: normal; overflow-wrap: anywhere; }
 .formula-editor, .latex-workbench > div, .form-split > div { min-width: 0; }
-.latex-preview p + p, .preview-line + .preview-line { margin-top: .3rem; }
+.latex-preview p + p { margin-top: .5em; }
 .content-form input[type="date"] { color-scheme: dark; min-width: 0; }
 .tag-picker { margin-top: 1rem; min-width: 0; }
 .tag-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .5rem; }
@@ -204,10 +204,19 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .settings-body { padding: .2rem .8rem 1rem; }
 .editor-footer { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .editor-footer .form-status, .editor-footer .editor-actions { margin: 0; }
-.formula-toolbar { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .65rem; }
-.formula-toolbar button { min-height: 32px; padding: .25rem .58rem; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-strong); color: var(--text-soft); font: inherit; font-size: .76rem; cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; }
-.formula-toolbar button:hover { border-color: #3b4657; background: #29313e; color: var(--text); }
-.formula-toolbar button:active { background: #303b4b; }
+.latex-toolbar { position: relative; display: grid; gap: .3rem; min-width: 0; margin: .15rem 0 .4rem; }
+.latex-toolbar-top { display: flex; align-items: center; gap: .35rem; min-width: 0; }
+.latex-categories, .latex-symbols { display: flex; align-items: center; gap: .25rem; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.latex-categories { flex: 1; }
+.latex-symbols { min-height: 35px; }
+.latex-toolbar button { flex: 0 0 auto; min-height: 33px; padding: .3rem .55rem; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-strong); color: var(--text-soft); font: inherit; font-size: .76rem; white-space: nowrap; cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.latex-toolbar button:hover { border-color: #3b4657; background: #29313e; color: var(--text); }
+.latex-toolbar button:active, .latex-categories button.is-active { background: #2d394b; border-color: #496189; color: var(--text); }
+.latex-toolbar .latex-color-trigger { color: var(--blue-hover); }
+.latex-color-palette { position: absolute; z-index: 7; top: calc(100% + .3rem); right: 0; width: min(325px, 100%); padding: .55rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface); box-shadow: 0 12px 24px #0005; }
+.latex-color-palette[hidden] { display: none; }
+.latex-color-palette .color-toolbar { margin: 0; }
+.latex-color-palette .color-toolbar > span { width: 100%; }
 .link-quick-entry { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--line-soft); }
 .link-quick-entry summary { color: var(--blue-hover); font-weight: 620; cursor: pointer; }
 .link-quick-form { display: grid; grid-template-columns: 1fr 1.35fr 1.3fr auto; align-items: end; gap: .7rem; margin-top: .9rem; }
@@ -230,7 +239,6 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .color-choice { min-height: 30px; padding: .2rem .46rem; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-strong); font-size: .76rem; cursor: pointer; }
 .color-choice:hover { background: var(--bg-raised); border-color: #4b576e; }
 .text-color-red { color: var(--color-red); }.text-color-orange { color: var(--color-orange); }.text-color-yellow { color: var(--color-yellow); }.text-color-green { color: var(--color-green); }.text-color-cyan { color: var(--color-cyan); }.text-color-blue { color: var(--color-blue); }.text-color-purple { color: var(--color-purple); }.text-color-pink { color: var(--color-pink); }.text-color-gray { color: var(--color-gray); }
-.preview-break { height: .3rem; }
 
 @media (min-width: 900px) and (min-height: 600px) {
   .editor-main { height: calc(100dvh - 72px); min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .45rem; padding: .7rem 0; overflow: hidden; }
@@ -238,22 +246,23 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
   .editor-main .page-heading h1 { font-size: 1.25rem; }
   .editor-main .page-heading .eyebrow, .editor-main .page-intro { display: none; }
   .editor-panel { min-height: 0; overflow: visible; }
-  .note-editor-form { height: 100%; min-height: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; gap: .35rem; padding: .7rem 1rem; }
+  .note-editor-form { height: 100%; min-height: 0; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; gap: .3rem; padding: .6rem .9rem; }
   .note-editor-form > label { margin: 0; }
   .note-editor-form #note-title { min-height: 38px; height: 38px; }
-  .note-editor-form .latex-workbench { min-height: 0; display: grid; grid-template-rows: minmax(0, 1.15fr) minmax(0, .85fr); gap: .5rem; }
+  .note-editor-form .latex-workbench { min-height: 0; display: grid; grid-template-rows: minmax(0, .95fr) minmax(0, 1.05fr); gap: .5rem; }
   .note-editor-form .latex-workbench > div + div { margin: 0; }
-  .note-editor-form .formula-editor { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; }
+  .note-editor-form .formula-editor { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
   .note-editor-form .preview-pane { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
   .note-editor-form .formula-editor > label, .note-editor-form .preview-pane > label { margin: 0 0 .2rem; }
   .note-editor-form #note-summary, .note-editor-form .latex-preview { height: 100%; min-height: 0; max-height: none; overflow-y: auto; }
   .note-editor-form #note-summary { resize: none; }
   .note-editor-form .formula-help { display: none; }
-  .note-editor-form .formula-toolbar, .note-editor-form .color-toolbar { margin-top: .2rem; }
+  .note-editor-form .latex-toolbar { margin: .1rem 0 .25rem; }
   .note-editor-form .formula-status { min-height: 0; margin: 0; }
   .note-editor-form .note-settings { position: relative; margin: 0; width: fit-content; min-width: 130px; }
   .note-editor-form .settings-body { position: absolute; z-index: 8; bottom: calc(100% + .4rem); left: 0; width: min(440px, 70vw); max-height: min(50dvh, 420px); overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface); box-shadow: 0 12px 28px #0005; }
   .note-editor-form .editor-footer .form-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note-editor-form .editor-footer .form-status { flex: 1; }
 }
 .note-reader { max-width: 900px; margin: 0 auto; padding: 2rem; }
 .note-reader h1 { margin: .25rem 0 .5rem; }
