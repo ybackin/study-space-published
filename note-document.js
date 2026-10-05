@@ -1,15 +1,16 @@
 // Versioned, allowlisted annotations. Legacy notes remain plain source strings.
 export const TEXT_COLORS=['default','red','orange','yellow','green','cyan','blue','purple','pink','gray'];
+const validMarks=(marks,length)=>marks.filter(mark=>Number.isInteger(mark.from)&&Number.isInteger(mark.to)&&mark.from>=0&&mark.to<=length&&mark.from<mark.to&&TEXT_COLORS.includes(mark.color)&&mark.color!=='default');
 export function readDocument(body='') {
-  if(typeof body!=='string') return {source:'',marks:[]};
+  if(typeof body!=='string') return {source:'',marks:[],mathColors:[]};
   try {
     const value=JSON.parse(body);
     if(value?.kind!=='study-note' || value.version!==1 || typeof value.source!=='string' || !Array.isArray(value.marks)) throw Error();
-    return {source:value.source,marks:value.marks.filter(mark=>Number.isInteger(mark.from)&&Number.isInteger(mark.to)&&mark.from>=0&&mark.to<=value.source.length&&mark.from<mark.to&&TEXT_COLORS.includes(mark.color)&&mark.color!=='default')};
-  } catch {return {source:body,marks:[]};}
+    return {source:value.source,marks:validMarks(value.marks,value.source.length),mathColors:validMarks(Array.isArray(value.mathColors)?value.mathColors:[],value.source.length)};
+  } catch {return {source:body,marks:[],mathColors:[]};}
 }
 export function writeDocument(document) {
-  return JSON.stringify({kind:'study-note',version:1,source:document.source,marks:document.marks});
+  return JSON.stringify({kind:'study-note',version:1,source:document.source,marks:document.marks,mathColors:document.mathColors||[]});
 }
 export function reconcileMarks(marks,before,after) {
   let start=0;while(start<before.length&&start<after.length&&before[start]===after[start]) start++;
@@ -97,6 +98,6 @@ export function visibleMathSpaces(source) {
 }
 export function finishedDocument(document) {
   const source=cleanInvalidSlashes(document.source);
-  return {source,marks:reconcileMarks(document.marks,document.source,source)};
+  return {source,marks:reconcileMarks(document.marks,document.source,source),mathColors:reconcileMarks(document.mathColors||[],document.source,source)};
 }
 
