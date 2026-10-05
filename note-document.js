@@ -5,12 +5,23 @@ export function readDocument(body='') {
   if(typeof body!=='string') return {source:'',marks:[],mathColors:[]};
   try {
     const value=JSON.parse(body);
-    if(value?.kind!=='study-note' || value.version!==1 || typeof value.source!=='string' || !Array.isArray(value.marks)) throw Error();
-    return {source:value.source,marks:validMarks(value.marks,value.source.length),mathColors:validMarks(Array.isArray(value.mathColors)?value.mathColors:[],value.source.length)};
+    if(value?.kind!=='study-note' || ![1,2].includes(value.version) || typeof value.source!=='string' || !Array.isArray(value.marks)) throw Error();
+    const parsed=blocks(value.source),mathNodes=parsed.flatMap(block=>block.type==='line'?block.children:[block]).filter(node=>node.type==='inlineMath'||node.type==='blockMath');
+    const savedNodes=Array.isArray(value.content)?value.content.flatMap(block=>block?.type==='line'&&Array.isArray(block.children)?block.children:[block]):[];
+    const nodeColors=mathNodes.flatMap(node=>{
+      const saved=savedNodes.find(item=>item?.type===node.type&&item.from===node.from&&item.to===node.to&&item.latex===node.source);
+      return saved&&TEXT_COLORS.includes(saved.color)&&saved.color!=='default'?[{from:node.from,to:node.to,color:saved.color}]:[];
+    });
+    return {source:value.source,marks:validMarks(value.marks,value.source.length),mathColors:value.version===2?nodeColors:validMarks(Array.isArray(value.mathColors)?value.mathColors:[],value.source.length)};
   } catch {return {source:body,marks:[],mathColors:[]};}
 }
 export function writeDocument(document) {
-  return JSON.stringify({kind:'study-note',version:1,source:document.source,marks:document.marks,mathColors:document.mathColors||[]});
+  return JSON.stringify({kind:'study-note',version:2,source:document.source,marks:validMarks(document.marks||[],document.source.length),content:documentBlocks(document)});
+}
+export function documentBlocks(document) {
+  const colorFor=node=>document.mathColors?.find(mark=>mark.from===node.from&&mark.to===node.to)?.color||null;
+  const mapNode=node=>node.type==='inlineMath'||node.type==='blockMath'?{type:node.type,latex:node.source,from:node.from,to:node.to,color:colorFor(node)}:{type:'text',text:node.source,from:node.from,to:node.to};
+  return blocks(document.source).map(block=>block.type==='line'?{type:'line',from:block.from,to:block.to,children:block.children.map(mapNode)}:block.type==='blockMath'?mapNode(block):{type:'break'});
 }
 export function reconcileMarks(marks,before,after) {
   let start=0;while(start<before.length&&start<after.length&&before[start]===after[start]) start++;
@@ -40,13 +51,20 @@ function mathLike(value) {
   return !/[\u3400-\u9fff]/.test(value) && (/\\[A-Za-z]+/.test(value) || /[A-Za-z0-9)]\s*[_^=<>]\s*[A-Za-z0-9({\\]/.test(value));
 }
 const cleanInvalidSlashes=source=>source.replace(/(?<!\\)\\(?![A-Za-z\\{}\[\]()%$&#_^ ,;:!])/g,'');
-function commandEnd(source,start) {
-  let end=start+1;while(/[A-Za-z]/.test(source[end]||''))end++;
-  if(end===start+1)return start;
-  while(source[end]==='{'){
-    let depth=0;do{if(source[end]==='{')depth++;else if(source[end]==='}')depth--;end++;}while(depth>0&&end<source.length);
+function mathRunEnd(source,start) {
+  if(!/[A-Za-z]/.test(source[start]||'')&&!(source[start]==='\\'&&/[A-Za-z]/.test(source[start+1]||'')))return start;
+  let end=start,braces=0;
+  while(end<source.length){
+    const char=source[end];
+    if(char==='{' ) braces++;
+    else if(char==='}') {if(!braces)break;braces--;}
+    else if(char===' '&&braces===0)break;
+    else if(!/[A-Za-z0-9\\_^=+*/<>()[\].,-]/.test(char)&&char!==' ')break;
+    end++;
   }
-  while(end<source.length&&/[A-Za-z0-9\\{}_^=+*/<>()[\].,-]/.test(source[end]))end++;
+  while(end>start&&/[.,]$/.test(source.slice(end-1,end)))end--;
+  const candidate=source.slice(start,end);
+  if(braces||!/(\\[A-Za-z]+|[_^=<>])/.test(candidate)||/[=<>+\-/_^]$/.test(candidate)||/[+*/=<>-]{2,}/.test(candidate))return start;
   return end;
 }
 function inlineNodes(source,from) {
@@ -54,11 +72,8 @@ function inlineNodes(source,from) {
   const addMath=(end,latex)=>{if(index>textStart)nodes.push({type:'text',source:source.slice(textStart,index),from:from+textStart,to:from+index});nodes.push({type:'inlineMath',source:latex,from:from+index,to:from+end});index=end;textStart=end;};
   while(index<source.length){
     if(source.startsWith('\\(',index)){const end=source.indexOf('\\)',index+2);if(end>=0){addMath(end+2,source.slice(index+2,end));continue;}}
-    if(source[index]==='\\') {const end=commandEnd(source,index);if(end>index){addMath(end,source.slice(index,end));continue;}}
-    if(/[A-Za-z]/.test(source[index])){
-      const match=source.slice(index).match(/^[A-Za-z][A-Za-z0-9]*(?:\([^)]*\))?(?:\s*[_^=<>]\s*(?:[A-Za-z0-9]+(?:\^[A-Za-z0-9]+)?|\([^)]*\)))+/);
-      if(match){addMath(index+match[0].length,match[0]);continue;}
-    }
+    const end=mathRunEnd(source,index);
+    if(end>index){addMath(end,source.slice(index,end));continue;}
     index++;
   }
   if(textStart<source.length||!nodes.length)nodes.push({type:'text',source:source.slice(textStart),from:from+textStart,to:from+source.length});
