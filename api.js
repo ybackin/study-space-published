@@ -65,9 +65,9 @@ export class StudyAPI {
   notes(scope='private') { return scope==='public' ? this.publicNotes() : this.myNotes(); }
   note(id) {return this.request('/rest/v1/study_notes?id=eq.'+encodeURIComponent(id)+'&select=id,title,body,summary,url,date,status,created_at,updated_at,visibility,author_id');}
   addNote({title,body='',summary='',url='',date='',visibility='private',status='published'}) {
-    return this.request('/rest/v1/study_notes',{method:'POST',headers:{Prefer:'return=representation'},body:{author_id:this.session.user.id,title:title.trim(),body:body || summary,summary:body || summary,url:url.trim() || null,date:date.trim() || null,status:status==='draft'?'draft':'published',visibility:visibility==='public'?'public':'private'}});
+    return this.request('/rest/v1/study_notes',{method:'POST',headers:{Prefer:'return=representation'},body:{author_id:this.session.user.id,title:title.trim(),body:body || summary,summary:summary || body,url:url.trim() || null,date:date.trim() || null,status:status==='draft'?'draft':'published',visibility:visibility==='public'?'public':'private'}});
   }
-  updateNote(id,{title,body='',url='',date='',visibility='private',status='published'}) {return this.request('/rest/v1/study_notes?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{Prefer:'return=representation'},body:{title:title.trim(),body,summary:body,url:url.trim() || null,date:date.trim() || null,status:status==='draft'?'draft':'published',visibility:visibility==='public'?'public':'private',updated_at:new Date().toISOString()}});}
+  updateNote(id,{title,body='',summary='',url='',date='',visibility='private',status='published'}) {return this.request('/rest/v1/study_notes?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{Prefer:'return=representation'},body:{title:title.trim(),body,summary:summary || body,url:url.trim() || null,date:date.trim() || null,status:status==='draft'?'draft':'published',visibility:visibility==='public'?'public':'private',updated_at:new Date().toISOString()}});}
   deleteNote(id) {return this.request('/rest/v1/study_notes?id=eq.'+encodeURIComponent(id),{method:'DELETE'});}
   addLink({title,description='',url}) {
     return this.request('/rest/v1/study_links',{method:'POST',headers:{Prefer:'return=minimal'},body:{title:title.trim(),description:description.trim(),url:url.trim()}});
