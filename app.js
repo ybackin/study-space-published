@@ -103,7 +103,7 @@ function contentList(items,type) {
   return list;
 }
 async function contentView(profile,run,editId='') {
-  const notes=await api.notes('private');if(run!==revision)return;
+  const notes=await api.myNotes();if(run!==revision)return;
   const content={notes,links:[]};
   document.body.className='';view.className='';view.replaceChildren(header(profile));
   const main=element('main','','content-main');
@@ -125,7 +125,7 @@ async function contentView(profile,run,editId='') {
   bind('note-form',saveNote);
 }
 async function plazaView(profile,run) {
-  const [notes,profiles]=await Promise.all([api.notes('public'),api.profileNames()]); if(run!==revision)return;
+  const [notes,profiles]=await Promise.all([api.publicNotes(),api.profileNames()]); if(run!==revision)return;
   const names=new Map(profiles.map(item=>[item.id,item.username]));
   document.body.className='';view.className='';view.replaceChildren(header(profile));
   const main=element('main','','content-main');
