@@ -72,7 +72,9 @@ export class StudyAPI {
   }
   deleteLink(id) {return this.request('/rest/v1/study_links?id=eq.'+encodeURIComponent(id),{method:'DELETE'});}
   accounts() {return this.request('/rest/v1/study_profiles?select=id,username,role&order=created_at');}
-  create(username,password,setupKey) {return this.request('/functions/v1/study-accounts',{method:'POST',authenticated:!setupKey,body:{action:setupKey?'setup':'create',username,password,...(setupKey?{setupKey}:{})}});}
+  profileNames() {return this.request('/rest/v1/study_profiles?select=id,username&order=created_at');}
+  create(username,password,setupKey) {return this.request('/functions/v1/study-accounts',{method:'POST',authenticated:false,body:{action:setupKey?'setup':'signup',username,password,...(setupKey?{setupKey}:{})}});}
+  createMember(username,password) {return this.request('/functions/v1/study-accounts',{method:'POST',body:{action:'create',username,password}});}
   async logout() {
     const session=this.session;
     this.save(null);
