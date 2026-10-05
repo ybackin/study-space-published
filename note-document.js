@@ -38,6 +38,7 @@ function mathLike(value) {
   // A whole formula line is math; ordinary prose and spacing remain text.
   return /\\[A-Za-z]+|[_^]|[=+*/<>]/.test(value) && !/[\u3400-\u9fff]/.test(value.replace(/\\[A-Za-z]+/g,''));
 }
+const cleanInvalidSlashes=source=>source.replace(/(?<!\\)\\(?![A-Za-z\\{}\[\]()%$&#_^ ,;:!])/g,'');
 export function blocks(source) {
   const result=[];let offset=0;
   for(const raw of source.split('\n')) {
@@ -57,7 +58,7 @@ export function blocks(source) {
     if(start<raw.length||!parts.length)parts.push({source:raw.slice(start),from:offset+start});
     for(const part of parts) {
       if(part.break){result.push({type:'break'});continue;}
-      const clean=part.source.replace(/\\(?![A-Za-z]|[{}%$&#_^])/g,'');
+      const clean=cleanInvalidSlashes(part.source);
       result.push({type:mathLike(clean)?'math':'text',source:clean,from:part.from,to:part.from+part.source.length});
     }
     result.push({type:'break'});offset+=raw.length+1;
@@ -70,7 +71,7 @@ export function visibleMathSpaces(source) {
   return source.replace(/ +/g,spaces=>'\\;'.repeat(spaces.length));
 }
 export function finishedDocument(document) {
-  const source=document.source.replace(/(?<!\\)\\(?=$|[\u3400-\u9fff])/g,'');
+  const source=cleanInvalidSlashes(document.source);
   return {source,marks:reconcileMarks(document.marks,document.source,source)};
 }
 
