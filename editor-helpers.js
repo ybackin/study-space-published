@@ -1,7 +1,7 @@
-// An odd trailing run of backslashes starts a command; pairs are TeX line breaks.
+// Only a standalone backslash starts completion. Consecutive slashes are line breaks.
 export function commandToken(source, cursor=source.length) {
   const match=source.slice(0,cursor).match(/(\\+)([A-Za-z]*)$/);
-  if(!match || match[1].length % 2===0) return null;
+  if(!match || match[1].length!==1) return null;
   return {from:cursor-match[2].length-1,query:match[2].toLowerCase()};
 }
 export function noteMetadata(value,statusValue='published') {
