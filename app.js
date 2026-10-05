@@ -11,7 +11,9 @@ function renderFormulaPreview(target,document) {
   const doc=typeof document==='string'?readDocument(document):document;
   if(!doc.source.trim()) { target.append(element('span','直接输入正文或公式，例如 \\frac{a}{b}。','preview-placeholder')); return; }
   for(const block of documentBlocks(doc)) {
-    if(block.type==='break'){target.append(element('div','\u00a0','preview-break'));continue;}
+    // Each logical line already has its own flow node. A separator is metadata,
+    // not another visible row; empty line nodes represent deliberate blank lines.
+    if(block.type==='break')continue;
     if(block.type==='line') {
       const holder=element('div','','preview-line');
       for(const node of block.children) {
@@ -41,6 +43,20 @@ const formulaSuggestions=[
   ['\\partial','偏导符号'],['\\begin{pmatrix}  &  \\\\  &  \\end{pmatrix}','矩阵'],['\\begin{vmatrix}  &  \\\\  &  \\end{vmatrix}','行列式'],
   ['\\end{pmatrix}','结束矩阵'],['\\end{aligned}','结束对齐环境'],
   ['\\leq','小于等于'],['\\neq','不等于'],['\\to','箭头'],['\\infty','无穷']
+];
+const formulaGroups=[
+  ['常用',[['分式','\\frac{}{}'],['根号','\\sqrt{}'],['上标','^{}'],['下标','_{}'],['积分','\\int_{a}^{b}'],['求和','\\sum_{i=1}^{n}']]],
+  ['希腊字母',[['α','\\alpha'],['β','\\beta'],['γ','\\gamma'],['θ','\\theta'],['π','\\pi'],['μ','\\mu'],['σ','\\sigma'],['ω','\\omega']]],
+  ['分式',[['分式','\\frac{}{}'],['大分式','\\dfrac{}{}'],['二项式','\\binom{}{}']]],
+  ['根式',[['平方根','\\sqrt{}'],['n 次根','\\sqrt[n]{}']]],
+  ['上下标',[['上标','^{}'],['下标','_{}'],['平方','^{2}'],['第 i 项','_{i}']]],
+  ['极限',[['极限','\\lim_{x\\to 0}'],['无穷','\\infty'],['趋于','\\to']]],
+  ['三角函数',[['sin','\\sin'],['cos','\\cos'],['tan','\\tan'],['arcsin','\\arcsin'],['log','\\log'],['ln','\\ln']]],
+  ['积分',[['积分','\\int_{a}^{b}'],['二重积分','\\iint'],['三重积分','\\iiint'],['围道积分','\\oint']]],
+  ['求和',[['求和','\\sum_{i=1}^{n}'],['乘积','\\prod_{i=1}^{n}']]],
+  ['大型运算',[['并集','\\bigcup'],['交集','\\bigcap'],['乘积','\\prod'],['求和','\\sum']]],
+  ['括号',[['圆括号','\\left(\\right)'],['方括号','\\left[\\right]'],['花括号','\\left\\{\\right\\}'],['尖括号','\\langle\\rangle']]],
+  ['矩阵',[['圆括矩阵','\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}'],['方括矩阵','\\begin{bmatrix}a&b\\\\c&d\\end{bmatrix}'],['分段函数','\\begin{cases}x,&x>0\\\\0,&x\\leq0\\end{cases}'],['对齐推导','\\begin{aligned}y&=a+b\\\\&=c\\end{aligned}']]]
 ];
 function setupFormulaInput(input,preview,menu,status,getDocument) {
   let renderedSource;
@@ -170,16 +186,29 @@ async function editorView(profile,run,editId='',restore=false) {
   const notes=await api.myNotes();if(run!==revision)return;
   document.body.className='editor-page';view.className='';view.replaceChildren(header(profile));
   const main=element('main','','content-main editor-main');
-  main.innerHTML='<div class="page-heading"><div><p class="eyebrow">NOTE EDITOR</p><h1 id="editor-title">新建笔记<span class="title-dot">.</span></h1><p class="page-intro">内容会自动保存为私密草稿；完成后可选择是否公开。</p></div><a class="secondary-link" href="#content">返回内容管理</a></div><section class="panel editor-panel"><form id="note-form" class="content-form note-editor-form"><label for="note-title">标题</label><input id="note-title" name="title" maxlength="100" placeholder="例如：线性代数第一章"><div class="latex-workbench"><div class="formula-editor"><label for="note-summary">正文与公式</label><textarea id="note-summary" name="summary" maxlength="5000" rows="12" placeholder="普通文字可直接输入；公式如 \\frac{1}{x+1} 或 \\int_0^1 x^2 dx"></textarea><div id="formula-menu" class="formula-menu" hidden></div><p class="formula-help">输入 \\fra、\\alp、\\sqrt、\\int 等命令可补全；↑↓ 选择，Enter / Tab 确认。</p><div class="formula-toolbar"><button type="button" data-formula="\\frac{}{}">分式</button><button type="button" data-formula="\\sqrt{}">根号</button><button type="button" data-formula="^{}">上标</button><button type="button" data-formula="_{ }">下标</button><button type="button" data-formula="\\sum_{i=1}^{n}">求和</button><button type="button" data-formula="\\int_{a}^{b}">积分</button><button type="button" data-formula="\\begin{pmatrix}  &  \\\\  &  \\end{pmatrix}">矩阵</button></div></div><div><label>实时预览</label><div id="latex-preview" class="latex-preview" aria-live="polite"></div><p id="formula-status" class="formula-status" role="status"></p></div></div><div class="tag-picker" id="tag-picker"></div><div class="form-split"><div><label for="note-date">日期</label><input id="note-date" name="date" type="date"></div><div><label for="note-visibility">完成后可见性</label><select id="note-visibility" name="visibility"><option value="private">私密</option><option value="public">公开到广场</option></select></div></div><p class="form-status" role="status">输入标题或正文后将自动保存为草稿。</p><div class="editor-actions"><button class="secondary-link" type="submit">立即保存草稿</button><button class="auth-submit" id="complete-note" type="button">完成并保存</button></div></form></section>';
+  main.innerHTML='<div class="page-heading"><div><p class="eyebrow">NOTE EDITOR</p><h1 id="editor-title">新建笔记<span class="title-dot">.</span></h1><p class="page-intro">内容会自动保存为私密草稿；完成后可选择是否公开。</p></div><a class="secondary-link" href="#content">返回内容管理</a></div><section class="panel editor-panel"><form id="note-form" class="content-form note-editor-form"><label for="note-title">标题</label><input id="note-title" name="title" maxlength="100" placeholder="例如：线性代数第一章"><div class="latex-workbench"><div class="formula-editor"><label for="note-summary">正文与公式</label><textarea id="note-summary" name="summary" maxlength="5000" rows="12" placeholder="普通文字可直接输入；公式如 \\frac{1}{x+1} 或 \\int_0^1 x^2 dx"></textarea><div id="formula-menu" class="formula-menu" hidden></div><p class="formula-help">输入 \\fra、\\alp、\\sqrt、\\int 等命令可补全；↑↓ 选择，Enter / Tab 确认。</p></div><div><label>实时预览</label><div id="latex-preview" class="latex-preview" aria-live="polite"></div><p id="formula-status" class="formula-status" role="status"></p></div></div><div class="tag-picker" id="tag-picker"></div><div class="form-split"><div><label for="note-date">日期</label><input id="note-date" name="date" type="date"></div><div><label for="note-visibility">完成后可见性</label><select id="note-visibility" name="visibility"><option value="private">私密</option><option value="public">公开到广场</option></select></div></div><p class="form-status" role="status">输入标题或正文后将自动保存为草稿。</p><div class="editor-actions"><button class="secondary-link" type="submit">立即保存草稿</button><button class="auth-submit" id="complete-note" type="button">完成并保存</button></div></form></section>';
   view.append(main);
   const form=main.querySelector('#note-form'),titleInput=form.elements.title,summary=form.elements.summary,dateInput=form.elements.date,visibilityInput=form.elements.visibility,status=form.querySelector('.form-status'),tagRoot=main.querySelector('#tag-picker'),tagPicker=setupTagPicker(tagRoot,notes.flatMap(note=>noteMetadata(note.date).tags)),preview=main.querySelector('#latex-preview');
   main.querySelector('.latex-workbench > div:last-child').classList.add('preview-pane');
   const settings=element('details','','note-settings'),settingsBody=element('div','','settings-body'),footer=element('div','','editor-footer');
   settings.append(element('summary','笔记设置'));settingsBody.append(tagRoot,form.querySelector('.form-split'));settings.append(settingsBody);
-  footer.append(status,form.querySelector('.editor-actions'));form.append(settings,footer);
-  const blockButton=element('button','独立公式块');blockButton.type='button';blockButton.title='把选中的公式放到独立一行';
-  blockButton.addEventListener('click',()=>{const start=summary.selectionStart,end=summary.selectionEnd,before=summary.value.slice(0,start),after=summary.value.slice(end),formula=summary.value.slice(start,end).trim()||'\\frac{}{}';summary.setRangeText((before&&!before.endsWith('\n')?'\n':'')+formula+(after&&!after.startsWith('\n')?'\n':''),start,end,'select');summary.dispatchEvent(new Event('input',{bubbles:true}));summary.focus();});
-  main.querySelector('.formula-toolbar').append(blockButton);
+  footer.append(settings,status,form.querySelector('.editor-actions'));form.append(footer);
+  const toolbar=element('div','','latex-toolbar'),toolbarTop=element('div','','latex-toolbar-top'),categories=element('div','','latex-categories'),symbols=element('div','','latex-symbols'),palette=element('div','','latex-color-palette');
+  categories.setAttribute('role','tablist');categories.setAttribute('aria-label','公式类别');
+  symbols.setAttribute('aria-label','快捷公式');
+  const colorTrigger=element('button','文字颜色','latex-color-trigger');colorTrigger.type='button';colorTrigger.setAttribute('aria-expanded','false');colorTrigger.setAttribute('aria-label','选择文字或公式颜色');
+  palette.hidden=true;
+  const showGroup=index=>{
+    categories.querySelectorAll('button').forEach((button,buttonIndex)=>{button.classList.toggle('is-active',buttonIndex===index);button.setAttribute('aria-selected',String(buttonIndex===index));});
+    symbols.replaceChildren();
+    for(const [label,latex] of formulaGroups[index][1]){const button=element('button',label);button.type='button';button.dataset.formula=latex;button.title=latex;symbols.append(button);}
+  };
+  formulaGroups.forEach(([label],index)=>{const button=element('button',label);button.type='button';button.setAttribute('role','tab');button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>showGroup(index));categories.append(button);});
+  colorTrigger.addEventListener('mousedown',event=>event.preventDefault());
+  colorTrigger.addEventListener('click',()=>{palette.hidden=!palette.hidden;colorTrigger.setAttribute('aria-expanded',String(!palette.hidden));});
+  toolbarTop.append(categories,colorTrigger);toolbar.append(toolbarTop,symbols,palette);form.querySelector('.latex-workbench').before(toolbar);showGroup(0);
+  symbols.addEventListener('mousedown',event=>{if(event.target.closest('button'))event.preventDefault();});
+  symbols.addEventListener('click',event=>{const button=event.target.closest('button[data-formula]');if(!button)return;const start=summary.selectionStart,end=summary.selectionEnd,formula=button.dataset.formula;summary.setRangeText(formula,start,end,'end');const placeholder=formula.indexOf('{}');if(placeholder>=0)summary.setSelectionRange(start+placeholder+1,start+placeholder+1);summary.dispatchEvent(new Event('input',{bubbles:true}));summary.focus();});
   let doc={source:'',marks:[],mathColors:[]},historyStack=[{source:'',marks:[],mathColors:[]}],historyIndex=0,selectedMath=null;
   const snapshot=()=>({source:doc.source,marks:doc.marks.map(mark=>({...mark})),mathColors:doc.mathColors.map(mark=>({...mark}))});
   const record=()=>{historyStack.splice(historyIndex+1);historyStack.push(snapshot());if(historyStack.length>200)historyStack.shift();historyIndex=historyStack.length-1;};
@@ -208,7 +237,7 @@ async function editorView(profile,run,editId='',restore=false) {
     else doc.marks=colorRange(doc.marks,from,to,color);
     record();renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);clearMathSelection();summary.focus();summary.setSelectionRange(from,to);summary.dispatchEvent(new Event('change',{bubbles:true}));
   });colorBar.append(button);}
-  main.querySelector('.formula-toolbar').before(colorBar);
+  palette.append(colorBar);
   summary.addEventListener('keydown',event=>{if(!(event.ctrlKey||event.metaKey)||!['z','y'].includes(event.key.toLowerCase()))return;event.preventDefault();historyIndex=Math.max(0,Math.min(historyStack.length-1,historyIndex+(event.key.toLowerCase()==='y'||event.shiftKey?1:-1)));doc={source:historyStack[historyIndex].source,marks:historyStack[historyIndex].marks.map(mark=>({...mark})),mathColors:historyStack[historyIndex].mathColors.map(mark=>({...mark}))};summary.value=doc.source;renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);summary.dispatchEvent(new Event('change',{bubbles:true}));});
   let noteId=editId||null,editVersion=0,savedVersion=0,timer=null,saveChain=Promise.resolve(),noteStatus='draft';
   const localKey=id=>`study-draft:${profile.id}:${id||'new'}`;
@@ -223,7 +252,6 @@ async function editorView(profile,run,editId='',restore=false) {
   const syncPreviewScroll=()=>{const editable=Math.max(1,summary.scrollHeight-summary.clientHeight),rendered=Math.max(0,preview.scrollHeight-preview.clientHeight);preview.scrollTop=(summary.scrollTop/editable)*rendered;};
   summary.addEventListener('scroll',syncPreviewScroll);
   summary.addEventListener('input',()=>requestAnimationFrame(syncPreviewScroll));
-  main.querySelectorAll('[data-formula]').forEach(button=>button.addEventListener('click',()=>{summary.focus();const start=summary.selectionStart;summary.setRangeText(button.dataset.formula,start,summary.selectionEnd,'end');summary.dispatchEvent(new Event('input'));}));
   const persistDraft=()=>{const version=editVersion,values=collect('draft');if(!titleInput.value.trim()&&!summary.value.trim())return Promise.resolve();status.textContent='正在保存草稿…';saveChain=saveChain.then(async()=>{const rows=noteId?await api.updateNote(noteId,values):await api.addNote(values);if(!rows?.length)throw new Error('草稿没有写入数据库，请检查网络后重试。');if(!noteId){noteId=rows[0].id;history.replaceState(null,'',`#editor?edit=${encodeURIComponent(noteId)}`);localStorage.removeItem(localKey(null));}noteStatus='draft';savedVersion=version;if(editVersion>savedVersion){cacheLocal();status.textContent='有新修改，继续同步…';scheduleSave();}else{clearLocal();status.textContent='草稿已保存。';}}).catch(error=>{cacheLocal();status.textContent='保存失败，内容已暂存在本机：'+error.message;});return saveChain;};
   const scheduleSave=()=>{editVersion++;cacheLocal();clearTimeout(timer);timer=setTimeout(persistDraft,1200);};
   for(const control of [titleInput,summary,dateInput,visibilityInput]){control.addEventListener('input',scheduleSave);control.addEventListener('change',scheduleSave);}
