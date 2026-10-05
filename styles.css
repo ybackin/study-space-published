@@ -143,10 +143,10 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .latex-workbench { display: block; width: 100%; }
 .latex-workbench > div { width: 100%; }
 .latex-workbench > div + div { margin-top: 1.25rem; }
-.latex-preview { width: 100%; min-height: 220px; overflow-x: auto; overflow-y: auto; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-strong); color: var(--text); line-height: 1.7; text-align: left; }
+.latex-preview { width: 100%; min-height: 220px; overflow-x: auto; overflow-y: auto; padding: 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-strong); color: var(--text); font-size: 18px; line-height: 1.8; text-align: left; }
 .preview-placeholder { color: var(--muted-dim); font-size: .86rem; }
 .preview-text { display: block; white-space: pre-wrap; }
-.formula-block { display: block; width: max-content; min-width: 100%; margin: .5rem 0; overflow-x: visible; text-align: left; }
+.formula-block { display: block; width: max-content; min-width: 100%; margin: 1.1rem 0; overflow-x: visible; text-align: left; }
 .formula-block .katex-display { margin: .65rem 0; }
 .formula-editor { position: relative; }
 .formula-help { margin-top: .45rem; color: var(--muted-dim); font-size: .76rem; }
@@ -155,6 +155,21 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .formula-menu { position: absolute; z-index: 5; top: calc(100% - 4.4rem); right: 0; left: 0; max-height: 240px; overflow: auto; padding: .3rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-strong); box-shadow: 0 14px 30px #0000003d; }
 .formula-suggestion { display: block; width: 100%; padding: .42rem .6rem; border: 0; border-radius: 6px; background: transparent; color: var(--text-soft); text-align: left; font: inherit; font-size: .82rem; cursor: pointer; }
 .formula-suggestion:hover, .formula-suggestion.is-active { background: #2a3445; color: var(--blue-hover); }
+.formula-suggestion { white-space: normal; overflow-wrap: anywhere; }
+.formula-editor, .latex-workbench > div, .form-split > div { min-width: 0; }
+.latex-preview p + p, .preview-text + .preview-text { margin-top: .8rem; }
+.content-form input[type="date"] { color-scheme: dark; min-width: 0; }
+.tag-picker { margin-top: 1rem; min-width: 0; }
+.tag-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .5rem; }
+.tag-chip { border: 1px solid var(--line); border-radius: var(--radius-small); padding: .25rem .55rem; background: var(--surface-strong); color: var(--text-soft); font-size: .8rem; max-width: 100%; overflow-wrap: anywhere; cursor: pointer; }
+.tag-chip:hover { color: var(--text); background: var(--bg-raised); }
+.tag-search-row { display: flex; gap: .5rem; }
+.tag-search-row input { flex: 1; min-width: 0; }
+.tag-search-row button { flex-shrink: 0; cursor: pointer; }
+.tag-options { max-height: 200px; overflow-y: auto; padding: .35rem; margin-top: .4rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-strong); }
+.tag-options button { display: block; width: 100%; text-align: left; padding: .5rem .6rem; border: 0; border-radius: 6px; background: transparent; color: var(--text-soft); cursor: pointer; overflow-wrap: anywhere; }
+.tag-options button:hover, .tag-options button:focus-visible { background: var(--surface); color: var(--blue-hover); }
+.tag-options p { color: var(--muted); padding: .5rem; font-size: .85rem; }
 .formula-toolbar { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .65rem; }
 .formula-toolbar button { min-height: 32px; padding: .25rem .58rem; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-strong); color: var(--text-soft); font: inherit; font-size: .76rem; cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; }
 .formula-toolbar button:hover { border-color: #3b4657; background: #29313e; color: var(--text); }
@@ -199,6 +214,9 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
   .content-form { padding: 1.2rem 1.15rem 1.35rem; }
   .note-editor-form #note-summary { min-height: 300px; }
   .latex-preview { min-height: 220px; }
+  .tag-search-row { flex-direction: column; }
+  .tag-search-row button { width: 100%; }
+  .formula-menu { right: 0; left: 0; max-width: 100%; }
   .link-quick-form { grid-template-columns: 1fr; }
   .note-item, .resource, .manage-row { padding-right: 1.15rem; padding-left: 1.15rem; }
   .manage-row { align-items: flex-start; flex-direction: column; }
