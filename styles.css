@@ -93,6 +93,8 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .footer-divider { padding: 0 .5rem; color: var(--line); }
 .note-item, .resource { display: block; padding: 1.2rem 1.45rem; border-bottom: 1px solid var(--line-soft); }
 .note-item:hover, .resource:hover { background: #20253066; }
+.note-item { cursor: pointer; transition: background .15s ease; }
+.note-item:hover { box-shadow: inset 2px 0 var(--blue); }
 .note-item p, .resource p { color: var(--muted); font-size: .88rem; }
 .note-meta { display: block; margin-top: .55rem; color: var(--muted-dim); font-size: .75rem; }
 .resource strong { display: block; font-size: .95rem; }
@@ -102,6 +104,8 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .welcome-copy h2 { margin-bottom: .3rem; font-size: 1.25rem; }
 .welcome-copy .eyebrow { margin-bottom: .3rem; }
 .welcome-text { color: var(--muted); font-size: .88rem; }
+.home-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.draft-recovery { display: block; margin: 0 0 1rem; padding: .8rem 1rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface); color: var(--blue-hover); font-size: .84rem; }
 .welcome-stats { display: flex; gap: .55rem; }
 .stat-card { min-width: 88px; padding: .7rem .85rem; border: 1px solid var(--line-soft); border-radius: var(--radius-small); background: var(--surface-soft); }
 .stat-card strong, .stat-card span { display: block; }
@@ -143,10 +147,10 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .latex-workbench { display: block; width: 100%; }
 .latex-workbench > div { width: 100%; }
 .latex-workbench > div + div { margin-top: 1.25rem; }
-.latex-preview { width: 100%; min-height: 220px; overflow-x: auto; overflow-y: auto; padding: 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-strong); color: var(--text); font-size: 18px; line-height: 1.8; text-align: left; }
+.latex-preview { width: 100%; min-height: 220px; overflow-x: auto; overflow-y: auto; padding: 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-strong); color: var(--text); font-size: 19px; line-height: 1.95; text-align: left; }
 .preview-placeholder { color: var(--muted-dim); font-size: .86rem; }
-.preview-text { display: block; white-space: pre-wrap; }
-.formula-block { display: block; width: max-content; min-width: 100%; margin: 1.1rem 0; overflow-x: visible; text-align: left; }
+.preview-text { display: block; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.95; }
+.formula-block { display: block; width: max-content; min-width: 100%; margin: 1.2rem 0; overflow-x: visible; text-align: left; }
 .formula-block .katex-display { margin: .65rem 0; }
 .formula-editor { position: relative; }
 .formula-help { margin-top: .45rem; color: var(--muted-dim); font-size: .76rem; }
@@ -170,6 +174,17 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .tag-options button { display: block; width: 100%; text-align: left; padding: .5rem .6rem; border: 0; border-radius: 6px; background: transparent; color: var(--text-soft); cursor: pointer; overflow-wrap: anywhere; }
 .tag-options button:hover, .tag-options button:focus-visible { background: var(--surface); color: var(--blue-hover); }
 .tag-options p { color: var(--muted); padding: .5rem; font-size: .85rem; }
+.note-filters { display: flex; flex-wrap: wrap; gap: .8rem; padding: 1rem 1.4rem; border-bottom: 1px solid var(--line-soft); }
+.note-filters label { display: grid; gap: .3rem; color: var(--muted); font-size: .75rem; }
+.note-filters select { min-width: 150px; min-height: 36px; padding: .35rem .6rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--input); color: var(--text); }
+.note-management-link { display: block; min-width: 0; flex: 1; color: inherit; }
+.note-management-link:hover strong { color: var(--blue-hover); }
+.note-list-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin-top: .55rem; }
+.tag-chip-static { display: inline-flex; width: fit-content; margin: 0; cursor: default; }
+.status-badge { display: inline-flex; align-items: center; min-height: 23px; padding: .12rem .45rem; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); font-size: .7rem; }
+.draft-badge { border-color: #5c4b2c; background: #272319; color: #d6b76f; }
+.editor-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .8rem; }
+.editor-actions button { min-height: 40px; cursor: pointer; }
 .formula-toolbar { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .65rem; }
 .formula-toolbar button { min-height: 32px; padding: .25rem .58rem; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-strong); color: var(--text-soft); font: inherit; font-size: .76rem; cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; }
 .formula-toolbar button:hover { border-color: #3b4657; background: #29313e; color: var(--text); }
@@ -186,7 +201,7 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .plaza-card p { min-height: 3.1em; overflow: hidden; color: var(--muted); font-size: .86rem; line-height: 1.65; }
 .note-reader { max-width: 900px; margin: 0 auto; padding: 2rem; }
 .note-reader h1 { margin: .25rem 0 .5rem; }
-.note-reader-body { min-height: 180px; overflow-x: auto; margin: 1.8rem 0; color: var(--text); line-height: 1.8; }
+.note-reader-body { min-height: 180px; overflow-x: auto; margin: 1.8rem 0; color: var(--text); font-size: 19px; line-height: 1.95; }
 .note-reader-body .katex-display { margin: 1.2rem 0; }
 
 @media (max-width: 1380px) { main { width: min(100% - 2.5rem, 1180px); } }
@@ -214,6 +229,10 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
   .content-form { padding: 1.2rem 1.15rem 1.35rem; }
   .note-editor-form #note-summary { min-height: 300px; }
   .latex-preview { min-height: 220px; }
+  .note-filters { display: grid; grid-template-columns: 1fr; padding: 1rem 1.15rem; }
+  .note-filters select { width: 100%; }
+  .editor-actions { flex-direction: column-reverse; }
+  .editor-actions button { width: 100%; }
   .tag-search-row { flex-direction: column; }
   .tag-search-row button { width: 100%; }
   .formula-menu { right: 0; left: 0; max-width: 100%; }
