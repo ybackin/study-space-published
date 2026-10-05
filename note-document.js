@@ -64,7 +64,7 @@ function mathRunEnd(source,start) {
   }
   while(end>start&&/[.,]$/.test(source.slice(end-1,end)))end--;
   const candidate=source.slice(start,end);
-  if(braces||!/(\\[A-Za-z]+|[_^=<>])/.test(candidate)||/[=<>+\-/_^]$/.test(candidate)||/[+*/=<>-]{2,}/.test(candidate))return start;
+  if(braces||!/(\\[A-Za-z]+|[_^=<>])/.test(candidate)||/[=<>+\-/_^]$/.test(candidate)||/[+*/=<>-]{2,}/.test(candidate.replace(/<=|>=/g,'@')))return start;
   return end;
 }
 function inlineNodes(source,from) {
