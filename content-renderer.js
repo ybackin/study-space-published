@@ -21,12 +21,14 @@ export function renderContent(content) {
     list.replaceChildren();
     notes.forEach(note => {
       const url = safeUrl(note.url);
-      const item = document.createElement(url ? 'a' : 'article');
+      const item = document.createElement('a');
       item.className = 'note-item';
-      if (url) item.href = url;
+      item.href = '#private?edit=' + encodeURIComponent(note.id);
+      item.setAttribute('aria-label','编辑笔记：'+note.title);
+      item.addEventListener('click',()=>sessionStorage.setItem('study-home-scroll',String(window.scrollY)));
       item.append(text('h3', note.title));
       if (note.summary) item.append(text('p', note.summary));
-      if (note.date) item.append(text('span', note.date, 'note-meta'));
+      const meta=text('span',[note.date,note.noteStatus==='draft'?'编辑中':'已完成',note.visibility==='public'&&note.noteStatus!=='draft'?'公开':'私密',note.updated_at?'更新于 '+new Date(note.updated_at).toLocaleString(): ''].filter(Boolean).join(' · '),'note-meta');item.append(meta);
       list.append(item);
     });
   }
