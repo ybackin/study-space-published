@@ -1,3 +1,4 @@
+:root{--note-editor-font:"Microsoft YaHei","Segoe UI","PingFang SC","Noto Sans CJK SC",sans-serif;--note-editor-placeholder:#7d889a}
 .math-workbench{height:100%;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:8px}
 .math-toolbar{position:relative;display:flex;align-items:center;gap:8px;min-height:38px;min-width:0}
 .math-categories{display:flex;gap:4px;overflow-x:auto;min-width:0;flex:1;scrollbar-width:thin}
