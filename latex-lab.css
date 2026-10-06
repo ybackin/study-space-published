@@ -1,0 +1,35 @@
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#101318;color:#dce3ef}
+*{box-sizing:border-box}
+body{margin:0}
+.lab{max-width:1280px;margin:auto;padding:16px 20px}
+header{display:flex;align-items:baseline;gap:16px}
+h1{font-size:20px;margin:0 0 10px}
+header p{font-size:13px;color:#98a4b8;margin:0}
+.toolbar,.categories,.symbols,.colors{display:flex;flex-wrap:wrap;gap:6px}
+.toolbar{justify-content:space-between;margin-bottom:6px}
+.symbols{min-height:36px;margin-bottom:8px}
+button{height:34px;padding:0 10px;border:1px solid #344052;border-radius:8px;background:#1e2530;color:#dce3ef;cursor:pointer}
+button:hover,button.is-active{background:#2c3950;border-color:#5574a6}
+.colors{margin-bottom:8px}
+.colors[hidden]{display:none}
+.workbench{height:calc(100dvh - 190px);min-height:440px;display:grid;grid-template-rows:45% 55%;gap:8px}
+.workbench section{min-height:0;display:flex;flex-direction:column}
+h2{font-size:13px;color:#aab6c9;margin:0 0 5px}
+.source-editor,.latex-preview{min-height:0;flex:1;overflow:auto;border:1px solid #303b4b;border-radius:10px;background:#181e27}
+.source-editor:focus-within{border-color:#5c86c4}
+.source-editor .cm-editor{height:100%;min-height:0}
+.source-editor .cm-scroller{height:100%;max-height:100%;min-height:0;overflow:auto}
+.latex-preview{padding:14px 18px;font-size:18px;line-height:1.72}
+.preview-line{min-height:1.72em;line-height:1.72}
+.preview-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.inline-formula{display:inline-block;vertical-align:baseline;white-space:normal;cursor:pointer}
+.formula-block{text-align:center;overflow-x:auto;cursor:pointer}
+.formula-block .katex-display{margin:.35em 0}
+.formula-selected{outline:1px solid #8db5ff;outline-offset:2px}
+.formula-error{color:#ff9b9b}
+.preview-placeholder{color:#79869a}
+.text-color-red{color:#ff7c86}.text-color-orange{color:#ffb46b}.text-color-yellow{color:#f5d779}.text-color-green{color:#8fdb9c}.text-color-cyan{color:#83d9e2}.text-color-blue{color:#9fbcff}.text-color-purple{color:#c2a2ff}.text-color-pink{color:#f3a3d6}.text-color-gray{color:#9ba5b5}
+.colors button[data-color=red]{color:#ff7c86}.colors button[data-color=blue]{color:#9fbcff}
+output{display:block;color:#9aa8bb;font-size:12px;margin-top:8px}
+@media(max-width:700px){.lab{padding:12px}.workbench{height:auto;min-height:0;grid-template-rows:280px 300px}header{display:block}header p{margin:4px 0 8px}}
+
