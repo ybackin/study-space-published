@@ -90,9 +90,12 @@ function readRun(source, start) {
   }
   // A lone English word belongs to prose; a command or expression belongs to math.
   if (!sawMath || cursor === start) return start;
+  // A TeX command remains math while the user is still writing an equation.
+  // Rejecting a trailing operator here would rescan from the command's second
+  // character and turn "\\int" into literal "\\" plus mathematical "int".
+  if (sawCommand) return cursor;
   const tail = source[cursor - 1];
   if (tail && '_^=+/<>-'.includes(tail)) return start;
-  if (sawCommand) return cursor;
   // Do not parse a plain word as math merely because it sits beside prose.
   return cursor;
 }
