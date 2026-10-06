@@ -6,35 +6,67 @@ import { readDocument, writeDocument, reconcileMarks, colorRange, blocks, docume
 const view=document.getElementById('site-view');
 let api, currentProfile, revision=0, activeDraftBackup=null;
 const element=(tag,text,className)=>{const node=document.createElement(tag);node.textContent=text || '';if(className)node.className=className;return node;};
+const previewStates=new WeakMap(),formulaHTML=new Map();
+let nextMathId=1;
+function cachedFormula(latex,displayMode) {
+  const source=visibleMathSpaces(latex),key=JSON.stringify([source,displayMode]);
+  if(formulaHTML.has(key))return formulaHTML.get(key);
+  const html=window.katex.renderToString(source,{displayMode,throwOnError:true,trust:false,strict:'ignore'});
+  if(formulaHTML.size>=200)formulaHTML.delete(formulaHTML.keys().next().value);
+  formulaHTML.set(key,html);
+  return html;
+}
+function reconcileChildren(parent,desired) {
+  const retained=new Set(desired);
+  for(const child of [...parent.childNodes])if(!retained.has(child))child.remove();
+  desired.forEach((node,index)=>{if(parent.childNodes[index]!==node)parent.insertBefore(node,parent.childNodes[index]||null);});
+}
+function sourceChange(before,after) {
+  let start=0;while(start<before.length&&start<after.length&&before[start]===after[start])start++;
+  let oldEnd=before.length,newEnd=after.length;
+  while(oldEnd>start&&newEnd>start&&before[oldEnd-1]===after[newEnd-1]){oldEnd--;newEnd--;}
+  return {start,oldEnd,delta:newEnd-oldEnd};
+}
 function renderFormulaPreview(target,document) {
-  target.replaceChildren();
   const doc=typeof document==='string'?readDocument(document):document;
-  if(!doc.source.trim()) { target.append(element('span','直接输入正文或公式，例如 \\frac{a}{b}。','preview-placeholder')); return; }
-  for(const block of documentBlocks(doc)) {
-    // Each logical line already has its own flow node. A separator is metadata,
-    // not another visible row; empty line nodes represent deliberate blank lines.
-    if(block.type==='break')continue;
-    if(block.type==='line') {
-      const holder=element('div','','preview-line');
-      for(const node of block.children) {
-        if(node.type==='inlineMath') {
-          const color=node.color,inline=element('span','',`inline-formula${color?' text-color-'+color:''}`);
-          inline.dataset.from=String(node.from);inline.dataset.to=String(node.to);inline.tabIndex=0;inline.setAttribute('role','button');inline.setAttribute('aria-label','选择行内公式以设置颜色');
-          try{inline.innerHTML=window.katex.renderToString(visibleMathSpaces(node.latex),{displayMode:false,throwOnError:true,trust:false,strict:'ignore'});}
-          catch(error){inline.append(element('code',error.message||'公式暂时无法解析。','formula-error'));}
-          holder.append(inline);continue;
-        }
-        const boundaries=[0,node.text.length,...doc.marks.flatMap(mark=>[mark.from-node.from,mark.to-node.from])].filter(value=>value>=0&&value<=node.text.length).sort((a,b)=>a-b);
-        for(let i=1;i<boundaries.length;i++){const from=boundaries[i-1],to=boundaries[i];if(to<=from)continue;const mark=doc.marks.find(item=>item.from<=node.from+from&&item.to>=node.from+to);holder.append(element('span',node.text.slice(from,to),mark?'text-color-'+mark.color:''));}
-      }
-      target.append(holder);continue;
+  if(!doc.source.trim()){previewStates.delete(target);target.replaceChildren(element('span','直接输入正文或公式，例如 \\frac{a}{b}。','preview-placeholder'));return;}
+  const prior=previewStates.get(target)||{source:'',rows:[],math:[]},change=sourceChange(prior.source,doc.source),used=new Set(),nextMath=[];
+  const matchingMath=(node,type)=>{
+    const candidates=prior.math.filter(old=>!used.has(old)&&old.type===type&&old.latex===node.latex);
+    const exact=candidates.find(old=>{
+      const from=old.to<=change.start?old.from:old.from>=change.oldEnd?old.from+change.delta:null;
+      return from===node.from;
+    });
+    const old=exact||candidates.find(item=>item.from<change.oldEnd&&item.to>change.start);if(old)used.add(old);
+    const wrapper=old?.element||element(type==='inlineMath'?'span':'div','',type==='inlineMath'?'inline-formula':'formula-block');
+    wrapper.className=(type==='inlineMath'?'inline-formula':'formula-block')+(node.color?' text-color-'+node.color:'');
+    wrapper.dataset.from=String(node.from);wrapper.dataset.to=String(node.to);
+    if(!old) {
+      wrapper.dataset.mathId=String(nextMathId++);wrapper.tabIndex=0;wrapper.setAttribute('role','button');wrapper.setAttribute('aria-label',type==='inlineMath'?'选择行内公式以设置颜色':'选择公式以设置颜色');
+      try{wrapper.innerHTML=cachedFormula(node.latex,type==='blockMath');}
+      catch(error){wrapper.append(element('code',error.message||'公式暂时无法解析。','formula-error'));}
     }
-    const color=block.color,holder=element('div','',`formula-block${color?' text-color-'+color:''}`);
-    holder.dataset.from=String(block.from);holder.dataset.to=String(block.to);holder.tabIndex=0;holder.setAttribute('role','button');holder.setAttribute('aria-label','选择独立公式以设置颜色');
-    try { holder.innerHTML=window.katex.renderToString(visibleMathSpaces(block.latex),{displayMode:true,throwOnError:true,trust:false,strict:'ignore'}); }
-    catch(error) { holder.append(element('code',error.message || '公式暂时无法解析。','formula-error')); }
-    target.append(holder);
+    nextMath.push({element:wrapper,type,latex:node.latex,from:node.from,to:node.to});
+    return wrapper;
+  };
+  const rows=[];
+  for(const block of documentBlocks(doc)){
+    if(block.type==='break')continue;
+    if(block.type==='blockMath'){rows.push({type:'blockMath',element:matchingMath(block,'blockMath')});continue;}
+    const index=rows.length,holder=prior.rows[index]?.type==='line'?prior.rows[index].element:element('div','','preview-line'),children=[];
+    for(const node of block.children){
+      if(node.type==='inlineMath'){children.push(matchingMath(node,'inlineMath'));continue;}
+      const boundaries=[0,node.text.length,...doc.marks.flatMap(mark=>[mark.from-node.from,mark.to-node.from])].filter(value=>value>=0&&value<=node.text.length).sort((a,b)=>a-b);
+      for(let i=1;i<boundaries.length;i++){
+        const from=boundaries[i-1],to=boundaries[i];if(to<=from)continue;
+        const mark=doc.marks.find(item=>item.from<=node.from+from&&item.to>=node.from+to);
+        children.push(element('span',node.text.slice(from,to),'preview-text'+(mark?' text-color-'+mark.color:'')));
+      }
+    }
+    reconcileChildren(holder,children);rows.push({type:'line',element:holder});
   }
+  reconcileChildren(target,rows.map(row=>row.element));
+  previewStates.set(target,{source:doc.source,rows,math:nextMath});
 }
 const formulaSuggestions=[
   ['\\alpha','希腊字母 α'],['\\beta','希腊字母 β'],['\\gamma','希腊字母 γ'],['\\theta','希腊字母 θ'],
