@@ -6,10 +6,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; connect-src 'self' https://*.supabase.co; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'">
   <title>自习室 · 我的学习空间</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232451e6'/%3E%3Cpath d='M8 8h6l2 2 2-2h6v17h-6l-2 2-2-2H8z' fill='white'/%3E%3C/svg%3E">
-  <link rel="preload" href="fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="auth.css">
+  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="auth.css"><link rel="stylesheet" href="latex-workbench.css">
 </head>
 <body class="auth-body">
   <div id="site-view" class="auth-layout"><a class="auth-brand" href="#login">自习室<span>.</span></a><section class="auth-card"><p class="eyebrow">MY STUDY SPACE</p><h1>欢迎回到自习室</h1><p class="auth-intro">正在连接你的学习空间。</p><p id="initial-message" role="status"></p></section></div>
@@ -34,9 +31,8 @@
   
   
 </template>
-  <link rel="stylesheet" href="katex.min.css">
-  <script src="katex.min.js"></script>
+  <script src="mathjax-config.js"></script>
+  <script defer src="mathjax/tex-svg-full.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>
-

@@ -23,4 +23,3 @@
 .account-list span { color: var(--muted); font-size: .76rem; white-space: nowrap; }
 .account-explainer { padding: 1.25rem 1.4rem; color: var(--muted); font-size: .8rem; }
 @media (max-width: 760px) { .auth-layout { padding-top: 2rem; } .auth-card { padding: 1.35rem; } .accounts-grid { grid-template-columns: 1fr; } .account-create { padding: 1.25rem; } }
-

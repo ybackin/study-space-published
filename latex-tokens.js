@@ -107,4 +107,3 @@ export function tokenizeLatex(source) {
   textUntil(source.length);
   return tokens;
 }
-

@@ -1,15 +1,19 @@
 import { StudyAPI } from './api.js';
 import { renderContent } from './content-renderer.js';
 import { noteMetadata, encodeMetadata, setupTagPicker } from './editor-helpers.js';
-import { readDocument, writeDocument, reconcileMarks, colorRange, blocks, finishedDocument, TEXT_COLORS } from './note-document.js';
-import {renderLatexPreview} from './latex-preview.js';
-import {createLatexSourceEditor} from './latex-source-editor.js';
-import {formulaGroups} from './latex-tools.js';
+import { readDocument, writeDocument } from './note-document.js';
+import {createMathPreview} from './latex-next-preview.js';
+import {mountLatexWorkbench} from './latex-next-workbench.js';
 
 const view=document.getElementById('site-view');
 let api, currentProfile, revision=0, activeDraftBackup=null;
 const element=(tag,text,className)=>{const node=document.createElement(tag);node.textContent=text || '';if(className)node.className=className;return node;};
-const renderFormulaPreview=(target,value)=>renderLatexPreview(target,typeof value==='string'?readDocument(value):value);
+const readPreviews=new WeakMap();
+const renderFormulaPreview=(target,value)=>{
+  let preview=readPreviews.get(target);
+  if(!preview){preview=createMathPreview(target);readPreviews.set(target,preview);}
+  preview.render(typeof value==='string'?readDocument(value):value);
+};
 function authView(mode) {
   const setup=mode==='setup',signup=mode==='signup';
   document.body.className='auth-body';
@@ -116,73 +120,44 @@ async function editorView(profile,run,editId='',restore=false) {
   const notes=await api.myNotes();if(run!==revision)return;
   document.body.className='editor-page';view.className='';view.replaceChildren(header(profile));
   const main=element('main','','content-main editor-main');
-  main.innerHTML='<div class="page-heading"><div><p class="eyebrow">NOTE EDITOR</p><h1 id="editor-title">新建笔记<span class="title-dot">.</span></h1><p class="page-intro">内容会自动保存为私密草稿；完成后可选择是否公开。</p></div><a class="secondary-link" href="#content">返回内容管理</a></div><section class="panel editor-panel"><form id="note-form" class="content-form note-editor-form"><label for="note-title">标题</label><input id="note-title" name="title" maxlength="100" placeholder="例如：线性代数第一章"><div class="latex-workbench"><div class="formula-editor"><label for="note-summary">正文与公式</label><div id="note-summary" class="source-editor" aria-label="正文与公式"></div><p class="formula-help">输入 \\fra、\\alp、\\sqrt、\\int 等命令可补全；↑↓ 选择，Enter / Tab 确认。</p></div><div><label>实时预览</label><div id="latex-preview" class="latex-preview" aria-live="polite"></div></div></div><div class="tag-picker" id="tag-picker"></div><div class="form-split"><div><label for="note-date">日期</label><input id="note-date" name="date" type="date"></div><div><label for="note-visibility">完成后可见性</label><select id="note-visibility" name="visibility"><option value="private">私密</option><option value="public">公开到广场</option></select></div></div><p class="form-status" role="status">输入标题或正文后将自动保存为草稿。</p><div class="editor-actions"><button class="secondary-link" type="submit">立即保存草稿</button><button class="auth-submit" id="complete-note" type="button">完成并保存</button></div></form></section>';
-  const sourceHost=main.querySelector('#note-summary');
+  main.innerHTML='<div class="page-heading"><div><p class="eyebrow">NOTE EDITOR</p><h1 id="editor-title">新建笔记<span class="title-dot">.</span></h1><p class="page-intro">内容会自动保存为私密草稿；完成后可选择是否公开。</p></div><a class="secondary-link" href="#content">返回内容管理</a></div><section class="panel editor-panel"><form id="note-form" class="content-form note-editor-form"><label for="note-title">标题</label><input id="note-title" name="title" maxlength="100" placeholder="例如：线性代数第一章"><div id="note-workbench-root"></div><div class="tag-picker" id="tag-picker"></div><div class="form-split"><div><label for="note-date">日期</label><input id="note-date" name="date" type="date"></div><div><label for="note-visibility">完成后可见性</label><select id="note-visibility" name="visibility"><option value="private">私密</option><option value="public">公开到广场</option></select></div></div><p class="form-status" role="status">输入标题或正文后将自动保存为草稿。</p><div class="editor-actions"><button class="secondary-link" type="submit">立即保存草稿</button><button class="auth-submit" id="complete-note" type="button">完成并保存</button></div></form></section>';
+  const workbenchRoot=main.querySelector('#note-workbench-root');
   view.append(main);
-  const form=main.querySelector('#note-form'),titleInput=form.elements.title,summary=createLatexSourceEditor(sourceHost),dateInput=form.elements.date,visibilityInput=form.elements.visibility,status=form.querySelector('.form-status'),tagRoot=main.querySelector('#tag-picker'),tagPicker=setupTagPicker(tagRoot,notes.flatMap(note=>noteMetadata(note.date).tags)),preview=main.querySelector('#latex-preview');
-  main.querySelector('.latex-workbench > div:last-child').classList.add('preview-pane');
+  const form=main.querySelector('#note-form'),titleInput=form.elements.title,dateInput=form.elements.date,visibilityInput=form.elements.visibility,status=form.querySelector('.form-status'),tagRoot=main.querySelector('#tag-picker'),tagPicker=setupTagPicker(tagRoot,notes.flatMap(note=>noteMetadata(note.date).tags));
+  let doc={source:'',marks:[],mathColors:[]},historyStack=[{source:'',marks:[],mathColors:[]}],historyIndex=0;
+  const snapshot=()=>({source:doc.source,marks:doc.marks.map(mark=>({...mark})),mathColors:doc.mathColors.map(mark=>({...mark}))});
+  const record=()=>{historyStack.splice(historyIndex+1);historyStack.push(snapshot());if(historyStack.length>200)historyStack.shift();historyIndex=historyStack.length-1;};
+  const workbench=mountLatexWorkbench(workbenchRoot,{document:doc,onChange:next=>{doc=next;record();workbenchRoot.dispatchEvent(new Event('input',{bubbles:true}));}});
+  const summary=workbenchRoot,preview=workbench.previewHost;
+  Object.defineProperties(summary,{
+    value:{get:()=>workbench.editor.getValue()},
+    scrollTop:{get:()=>workbench.editor.view.scrollDOM.scrollTop,set:value=>{workbench.editor.view.scrollDOM.scrollTop=value;}},
+    scrollHeight:{get:()=>workbench.editor.view.scrollDOM.scrollHeight},
+    clientHeight:{get:()=>workbench.editor.view.scrollDOM.clientHeight},
+  });
+  summary.focus=()=>workbench.editor.focus();
+  summary.setSelectionRange=(from,to=from)=>workbench.editor.view.dispatch({selection:{anchor:from,head:to},scrollIntoView:true});
   const settings=element('details','','note-settings'),settingsBody=element('div','','settings-body'),footer=element('div','','editor-footer');
   settings.append(element('summary','笔记设置'));settingsBody.append(tagRoot,form.querySelector('.form-split'));settings.append(settingsBody);
   footer.append(settings,status,form.querySelector('.editor-actions'));form.append(footer);
-  const toolbar=element('div','','latex-toolbar'),toolbarTop=element('div','','latex-toolbar-top'),categories=element('div','','latex-categories'),symbols=element('div','','latex-symbols'),palette=element('div','','latex-color-palette');
-  categories.setAttribute('role','tablist');categories.setAttribute('aria-label','公式类别');
-  symbols.setAttribute('aria-label','快捷公式');
-  const colorTrigger=element('button','文字颜色','latex-color-trigger');colorTrigger.type='button';colorTrigger.setAttribute('aria-expanded','false');colorTrigger.setAttribute('aria-label','选择文字或公式颜色');
-  palette.hidden=true;
-  const showGroup=index=>{
-    categories.querySelectorAll('button').forEach((button,buttonIndex)=>{button.classList.toggle('is-active',buttonIndex===index);button.setAttribute('aria-selected',String(buttonIndex===index));});
-    symbols.replaceChildren();
-    for(const [label,latex] of formulaGroups[index][1]){const button=element('button',label);button.type='button';button.dataset.formula=latex;button.title=latex;symbols.append(button);}
-  };
-  formulaGroups.forEach(([label],index)=>{const button=element('button',label);button.type='button';button.setAttribute('role','tab');button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>showGroup(index));categories.append(button);});
-  colorTrigger.addEventListener('mousedown',event=>event.preventDefault());
-  colorTrigger.addEventListener('click',()=>{palette.hidden=!palette.hidden;colorTrigger.setAttribute('aria-expanded',String(!palette.hidden));});
-  toolbarTop.append(categories,colorTrigger);toolbar.append(toolbarTop,symbols,palette);form.querySelector('.latex-workbench').before(toolbar);showGroup(0);
-  symbols.addEventListener('mousedown',event=>{if(event.target.closest('button'))event.preventDefault();});
-  symbols.addEventListener('click',event=>{const button=event.target.closest('button[data-formula]');if(!button)return;const start=summary.selectionStart,end=summary.selectionEnd,formula=button.dataset.formula;summary.setRangeText(formula,start,end,'end');const placeholder=formula.indexOf('{}');if(placeholder>=0)summary.setSelectionRange(start+placeholder+1,start+placeholder+1);summary.dispatchEvent(new Event('input',{bubbles:true}));summary.focus();});
-  let doc={source:'',marks:[],mathColors:[]},historyStack=[{source:'',marks:[],mathColors:[]}],historyIndex=0,selectedMath=null;
-  const snapshot=()=>({source:doc.source,marks:doc.marks.map(mark=>({...mark})),mathColors:doc.mathColors.map(mark=>({...mark}))});
-  const record=()=>{historyStack.splice(historyIndex+1);historyStack.push(snapshot());if(historyStack.length>200)historyStack.shift();historyIndex=historyStack.length-1;};
-  const clearMathSelection=()=>{selectedMath=null;preview.querySelectorAll('.formula-selected').forEach(node=>node.classList.remove('formula-selected'));};
-  const selectMath=target=>{const node=target?.closest?.('.inline-formula,.formula-block');if(!node||!preview.contains(node))return;clearMathSelection();selectedMath={from:Number(node.dataset.from),to:Number(node.dataset.to)};node.classList.add('formula-selected');};
-  preview.addEventListener('click',event=>selectMath(event.target));
-  preview.addEventListener('focusin',event=>selectMath(event.target));
-  preview.addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)&&event.target.closest('.inline-formula,.formula-block')){event.preventDefault();selectMath(event.target);}});
-  const selectedPreviewMath=()=>{
-    const selection=window.getSelection();if(!selection?.rangeCount||selection.isCollapsed)return null;
-    const range=selection.getRangeAt(0),nodes=[...preview.querySelectorAll('.inline-formula,.formula-block')].filter(node=>range.intersectsNode(node));
-    return nodes.length===1?{from:Number(nodes[0].dataset.from),to:Number(nodes[0].dataset.to)}:null;
-  };
-  summary.addEventListener('focus',clearMathSelection);
-  const syncSource=()=>{if(summary.value===doc.source)return;clearMathSelection();doc={source:summary.value,marks:reconcileMarks(doc.marks,doc.source,summary.value),mathColors:reconcileMarks(doc.mathColors,doc.source,summary.value)};record();};
-  summary.addEventListener('input',syncSource);
-  summary.addEventListener('input',()=>renderFormulaPreview(preview,doc));
-  const colorBar=element('div','','color-toolbar');colorBar.append(element('span','文字 / 公式颜色'));
-  const colorNames={default:'默认',red:'红',orange:'橙',yellow:'黄',green:'绿',cyan:'青',blue:'蓝',purple:'紫',pink:'粉',gray:'灰'};
-  for(const color of TEXT_COLORS){const button=element('button',colorNames[color],'color-choice text-color-'+color);button.type='button';button.dataset.color=color;button.title='把选中的正文文字设为'+colorNames[color];button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{
-    const from=summary.selectionStart,to=summary.selectionEnd,nodes=blocks(doc.source).flatMap(block=>block.type==='line'?block.children:[block]),mathNodes=nodes.filter(node=>['inlineMath','blockMath'].includes(node.type));
-    const previewMath=selectedMath||selectedPreviewMath();
-    const wholeMath=previewMath?mathNodes.find(node=>node.from===previewMath.from&&node.to===previewMath.to):mathNodes.find(node=>from===to?from>=node.from&&from<node.to:from<=node.from&&to>=node.to);
-    if(wholeMath&&(previewMath||mathNodes.filter(node=>from<node.to&&to>node.from).length===1&&(from===to||from===wholeMath.from&&to===wholeMath.to)))doc.mathColors=colorRange(doc.mathColors,wholeMath.from,wholeMath.to,color);
-    else if(from===to){status.textContent='先选中普通文字，或把光标放在公式中。';return;}
-    else if(mathNodes.some(node=>from<node.to&&to>node.from)){status.textContent='请只选择普通文字，或单独选择一条完整公式。';return;}
-    else doc.marks=colorRange(doc.marks,from,to,color);
-    record();renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);clearMathSelection();summary.focus();summary.setSelectionRange(from,to);summary.dispatchEvent(new Event('change',{bubbles:true}));
-  });colorBar.append(button);}
-  palette.append(colorBar);
-  summary.addEventListener('keydown',event=>{if(!(event.ctrlKey||event.metaKey)||!['z','y'].includes(event.key.toLowerCase()))return;event.preventDefault();event.stopPropagation();historyIndex=Math.max(0,Math.min(historyStack.length-1,historyIndex+(event.key.toLowerCase()==='y'||event.shiftKey?1:-1)));doc={source:historyStack[historyIndex].source,marks:historyStack[historyIndex].marks.map(mark=>({...mark})),mathColors:historyStack[historyIndex].mathColors.map(mark=>({...mark}))};summary.value=doc.source;renderFormulaPreview(preview,doc);requestAnimationFrame(syncPreviewScroll);summary.dispatchEvent(new Event('change',{bubbles:true}));},true);
+  summary.addEventListener('keydown',event=>{
+    if(!(event.ctrlKey||event.metaKey)||!['z','y'].includes(event.key.toLowerCase()))return;
+    event.preventDefault();event.stopPropagation();
+    historyIndex=Math.max(0,Math.min(historyStack.length-1,historyIndex+(event.key.toLowerCase()==='y'||event.shiftKey?1:-1)));
+    doc={source:historyStack[historyIndex].source,marks:historyStack[historyIndex].marks.map(mark=>({...mark})),mathColors:historyStack[historyIndex].mathColors.map(mark=>({...mark}))};
+    workbench.setDocument(doc);summary.dispatchEvent(new Event('change',{bubbles:true}));
+  },true);
   let noteId=editId||null,editVersion=0,savedVersion=0,timer=null,saveChain=Promise.resolve(),noteStatus='draft';
   const localKey=id=>`study-draft:${profile.id}:${id||'new'}`;
-  const collect=(state='draft')=>{const desired=visibilityInput.value==='public'?'public':'private',saved=state==='published'?finishedDocument(doc):doc;return {title:titleInput.value.trim()||'未命名草稿',body:writeDocument(saved),summary:saved.source,date:encodeMetadata(dateInput.value,tagPicker.get(),desired),status:state,visibility:state==='draft'?'private':desired};};
+  const collect=(state='draft')=>{const desired=visibilityInput.value==='public'?'public':'private';return {title:titleInput.value.trim()||'未命名草稿',body:writeDocument(doc),summary:doc.source,date:encodeMetadata(dateInput.value,tagPicker.get(),desired),status:state,visibility:state==='draft'?'private':desired};};
   const currentValues=()=>({title:titleInput.value,summary:summary.value,marks:doc.marks,mathColors:doc.mathColors,date:dateInput.value,tags:tagPicker.get(),visibility:visibilityInput.value});
   const cacheLocal=()=>{const values=currentValues();if(!values.title.trim()&&!values.summary.trim())return;const backup={noteId,updatedAt:new Date().toISOString(),values};try{localStorage.setItem(localKey(noteId),JSON.stringify(backup));if(noteId)localStorage.removeItem(localKey(null));}catch{}};
   const clearLocal=()=>{try{localStorage.removeItem(localKey(noteId));localStorage.removeItem(localKey(null));}catch{}};
-  const applyValues=values=>{titleInput.value=values.title||'';doc={source:values.summary||'',marks:Array.isArray(values.marks)?values.marks:[],mathColors:Array.isArray(values.mathColors)?values.mathColors:[]};summary.value=doc.source;historyStack=[snapshot()];historyIndex=0;dateInput.value=values.date||'';tagPicker.set(Array.isArray(values.tags)?values.tags:[]);visibilityInput.value=values.visibility==='public'?'public':'private';renderFormulaPreview(preview,doc);};
+  const applyValues=values=>{titleInput.value=values.title||'';doc={source:values.summary||'',marks:Array.isArray(values.marks)?values.marks:[],mathColors:Array.isArray(values.mathColors)?values.mathColors:[]};workbench.setDocument(doc);historyStack=[snapshot()];historyIndex=0;dateInput.value=values.date||'';tagPicker.set(Array.isArray(values.tags)?values.tags:[]);visibilityInput.value=values.visibility==='public'?'public':'private';};
   const findBackup=id=>{try{return JSON.parse(localStorage.getItem(localKey(id))||'null');}catch{return null;}};
-  if(editId){const rows=await api.note(editId);if(run!==revision)return;const note=rows[0];if(!note||note.author_id!==profile.id)throw new Error('笔记不存在或当前账号无权编辑。');const meta=noteMetadata(note.date,note.status);noteStatus=meta.status;titleInput.value=note.title;doc=readDocument(note.body||note.summary||'');summary.value=doc.source;historyStack=[snapshot()];dateInput.value=meta.date;tagPicker.set(meta.tags);visibilityInput.value=meta.desiredVisibility==='public'||note.visibility==='public'?'public':'private';main.querySelector('#editor-title').firstChild.textContent=meta.status==='draft'?'继续编辑草稿':'编辑笔记';const backup=findBackup(editId);if(backup?.updatedAt&&new Date(backup.updatedAt)>new Date(note.updated_at||note.created_at)){if(confirm('发现比云端更新的本地内容，是否恢复？'))applyValues(backup.values);else localStorage.removeItem(localKey(editId));}status.textContent=meta.status==='draft'?'这是尚未完成的草稿，编辑后会自动保存。':'修改后会自动保存为私密草稿；完成后可重新发布。';}
-  renderFormulaPreview(preview,doc);
+  if(editId){const rows=await api.note(editId);if(run!==revision)return;const note=rows[0];if(!note||note.author_id!==profile.id)throw new Error('笔记不存在或当前账号无权编辑。');const meta=noteMetadata(note.date,note.status);noteStatus=meta.status;titleInput.value=note.title;doc=readDocument(note.body||note.summary||'');workbench.setDocument(doc);historyStack=[snapshot()];dateInput.value=meta.date;tagPicker.set(meta.tags);visibilityInput.value=meta.desiredVisibility==='public'||note.visibility==='public'?'public':'private';main.querySelector('#editor-title').firstChild.textContent=meta.status==='draft'?'继续编辑草稿':'编辑笔记';const backup=findBackup(editId);if(backup?.updatedAt&&new Date(backup.updatedAt)>new Date(note.updated_at||note.created_at)){if(confirm('发现比云端更新的本地内容，是否恢复？'))applyValues(backup.values);else localStorage.removeItem(localKey(editId));}status.textContent=meta.status==='draft'?'这是尚未完成的草稿，编辑后会自动保存。':'修改后会自动保存为私密草稿；完成后可重新发布。';}
   const syncPreviewScroll=()=>{const editable=Math.max(1,summary.scrollHeight-summary.clientHeight),rendered=Math.max(0,preview.scrollHeight-preview.clientHeight);preview.scrollTop=(summary.scrollTop/editable)*rendered;};
-  summary.addEventListener('scroll',syncPreviewScroll);
+  workbench.editor.view.scrollDOM.addEventListener('scroll',syncPreviewScroll);
   summary.addEventListener('input',()=>requestAnimationFrame(syncPreviewScroll));
   const persistDraft=()=>{const version=editVersion,values=collect('draft');if(!titleInput.value.trim()&&!summary.value.trim())return Promise.resolve();status.textContent='正在保存草稿…';saveChain=saveChain.then(async()=>{const rows=noteId?await api.updateNote(noteId,values):await api.addNote(values);if(!rows?.length)throw new Error('草稿没有写入数据库，请检查网络后重试。');if(!noteId){noteId=rows[0].id;history.replaceState(null,'',`#editor?edit=${encodeURIComponent(noteId)}`);localStorage.removeItem(localKey(null));}noteStatus='draft';savedVersion=version;if(editVersion>savedVersion){cacheLocal();status.textContent='有新修改，继续同步…';scheduleSave();}else{clearLocal();status.textContent='草稿已保存。';}}).catch(error=>{cacheLocal();status.textContent='保存失败，内容已暂存在本机：'+error.message;});return saveChain;};
   const scheduleSave=()=>{editVersion++;cacheLocal();clearTimeout(timer);timer=setTimeout(persistDraft,1200);};

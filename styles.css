@@ -154,27 +154,7 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .danger-button:hover { background: #38202a; }
 .danger-button:disabled { opacity: .5; cursor: wait; }
 
-.note-editor-form #note-summary { height: min(50dvh, 520px); min-height: 320px; max-height: 520px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--input); }
-.note-editor-form #note-summary:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px #5b8cff1a; }
-.note-editor-form #note-summary .cm-editor { height: 100%; min-height: 0; }
-.note-editor-form #note-summary .cm-scroller { height: 100%; max-height: 100%; min-height: 0; overflow: auto; }
-.latex-workbench { display: block; width: 100%; }
-.latex-workbench > div { width: 100%; }
-.latex-workbench > div + div { margin-top: 1.25rem; }
-.latex-preview { width: 100%; height: min(45dvh, 480px); min-height: 220px; max-height: 480px; overflow-y: auto; overflow-x: auto; padding: .8rem 1rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-strong); color: var(--text); font-size: 18px; line-height: 1.72; text-align: left; }
-.preview-placeholder { color: var(--muted-dim); font-size: .86rem; }
-.preview-line { display: block; min-height: 1.72em; line-height: 1.72; }
-.preview-text { white-space: pre-wrap; overflow-wrap: anywhere; }
-.inline-formula { display: inline-block; white-space: normal; vertical-align: baseline; }
-.formula-block { display: block; width: 100%; margin: .35em 0; overflow-x: auto; text-align: center; }
-.inline-formula, .formula-block { cursor: pointer; border-radius: 3px; }
-.formula-selected, .inline-formula:focus-visible, .formula-block:focus-visible { outline: 1px solid var(--blue); outline-offset: 2px; }
-.formula-block .katex-display { margin: 0; }
-.formula-editor { position: relative; }
-.formula-help { margin-top: .45rem; color: var(--muted-dim); font-size: .76rem; }
-.formula-error { display: block; color: var(--danger); white-space: pre-wrap; font-family: ui-monospace, monospace; }
-.formula-editor, .latex-workbench > div, .form-split > div { min-width: 0; }
-.latex-preview p + p { margin-top: .5em; }
+.form-split > div { min-width: 0; }
 .content-form input[type="date"] { color-scheme: dark; min-width: 0; }
 .tag-picker { margin-top: 1rem; min-width: 0; }
 .tag-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .5rem; }
@@ -198,24 +178,12 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .draft-badge { border-color: #5c4b2c; background: #272319; color: #d6b76f; }
 .editor-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .8rem; }
 .editor-actions button { min-height: 40px; cursor: pointer; }
+.note-editor-form #note-workbench-root { height: 650px; min-height: 0; min-width: 0; }
 .note-settings { margin-top: .8rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-soft); }
 .note-settings > summary { padding: .5rem .7rem; color: var(--text-soft); font-size: .8rem; cursor: pointer; }
 .settings-body { padding: .2rem .8rem 1rem; }
 .editor-footer { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .editor-footer .form-status, .editor-footer .editor-actions { margin: 0; }
-.latex-toolbar { position: relative; display: grid; gap: .3rem; min-width: 0; margin: .15rem 0 .4rem; }
-.latex-toolbar-top { display: flex; align-items: center; gap: .35rem; min-width: 0; }
-.latex-categories, .latex-symbols { display: flex; align-items: center; gap: .25rem; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
-.latex-categories { flex: 1; }
-.latex-symbols { min-height: 35px; }
-.latex-toolbar button { flex: 0 0 auto; min-height: 33px; padding: .3rem .55rem; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-strong); color: var(--text-soft); font: inherit; font-size: .76rem; white-space: nowrap; cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; }
-.latex-toolbar button:hover { border-color: #3b4657; background: #29313e; color: var(--text); }
-.latex-toolbar button:active, .latex-categories button.is-active { background: #2d394b; border-color: #496189; color: var(--text); }
-.latex-toolbar .latex-color-trigger { color: var(--blue-hover); }
-.latex-color-palette { position: absolute; z-index: 7; top: calc(100% + .3rem); right: 0; width: min(325px, 100%); padding: .55rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface); box-shadow: 0 12px 24px #0005; }
-.latex-color-palette[hidden] { display: none; }
-.latex-color-palette .color-toolbar { margin: 0; }
-.latex-color-palette .color-toolbar > span { width: 100%; }
 .link-quick-entry { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--line-soft); }
 .link-quick-entry summary { color: var(--blue-hover); font-weight: 620; cursor: pointer; }
 .link-quick-form { display: grid; grid-template-columns: 1fr 1.35fr 1.3fr auto; align-items: end; gap: .7rem; margin-top: .9rem; }
@@ -233,11 +201,6 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .private-stat span { color: var(--muted); font-size: .82rem; }
 .private-tags { padding: 1.25rem; margin-bottom: 1rem; }
 .private-tag-links { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
-.color-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin-top: .8rem; }
-.color-toolbar > span { margin-right: .3rem; color: var(--muted); font-size: .77rem; }
-.color-choice { min-height: 30px; padding: .2rem .46rem; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-strong); font-size: .76rem; cursor: pointer; }
-.color-choice:hover { background: var(--bg-raised); border-color: #4b576e; }
-.text-color-red { color: var(--color-red); }.text-color-orange { color: var(--color-orange); }.text-color-yellow { color: var(--color-yellow); }.text-color-green { color: var(--color-green); }.text-color-cyan { color: var(--color-cyan); }.text-color-blue { color: var(--color-blue); }.text-color-purple { color: var(--color-purple); }.text-color-pink { color: var(--color-pink); }.text-color-gray { color: var(--color-gray); }
 
 @media (min-width: 900px) and (min-height: 600px) {
   .editor-main { height: calc(100dvh - 72px); min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .45rem; padding: .7rem 0; overflow: hidden; }
@@ -245,18 +208,10 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
   .editor-main .page-heading h1 { font-size: 1.25rem; }
   .editor-main .page-heading .eyebrow, .editor-main .page-intro { display: none; }
   .editor-panel { min-height: 0; overflow: visible; }
-  .note-editor-form { height: 100%; min-height: 0; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; gap: .3rem; padding: .6rem .9rem; }
+  .note-editor-form { height: 100%; min-height: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: .3rem; padding: .6rem .9rem; }
   .note-editor-form > label { margin: 0; }
   .note-editor-form #note-title { min-height: 38px; height: 38px; }
-  .note-editor-form .latex-workbench { min-height: 0; display: grid; grid-template-rows: minmax(0, .95fr) minmax(0, 1.05fr); gap: .5rem; }
-  .note-editor-form .latex-workbench > div + div { margin: 0; }
-  .note-editor-form .formula-editor { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
-  .note-editor-form .preview-pane { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
-  .note-editor-form .formula-editor > label, .note-editor-form .preview-pane > label { margin: 0 0 .2rem; }
-  .note-editor-form #note-summary, .note-editor-form .latex-preview { height: 100%; min-height: 0; max-height: none; }
-  .note-editor-form .latex-preview { overflow-y: auto; }
-  .note-editor-form .formula-help { display: none; }
-  .note-editor-form .latex-toolbar { margin: .1rem 0 .25rem; }
+  .note-editor-form #note-workbench-root { height: 100%; min-height: 0; }
   .note-editor-form .note-settings { position: relative; margin: 0; width: fit-content; min-width: 130px; }
   .note-editor-form .settings-body { position: absolute; z-index: 8; bottom: calc(100% + .4rem); left: 0; width: min(440px, 70vw); max-height: min(50dvh, 420px); overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface); box-shadow: 0 12px 28px #0005; }
   .note-editor-form .editor-footer .form-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -265,7 +220,7 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .note-reader { max-width: 900px; margin: 0 auto; padding: 2rem; }
 .note-reader h1 { margin: .25rem 0 .5rem; }
 .note-reader-body { min-height: 180px; overflow-x: auto; margin: 1.8rem 0; color: var(--text); font-size: 19px; line-height: 1.95; }
-.note-reader-body .katex-display { margin: 1.2rem 0; }
+.note-reader-body .math-display { margin: .7em 0; }
 
 @media (max-width: 1380px) { main { width: min(100% - 2.5rem, 1180px); } }
 @media (max-width: 900px) {
@@ -292,8 +247,7 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
   .section-heading { align-items: flex-start; flex-wrap: wrap; padding: 1.1rem 1.15rem; }
   .section-heading-actions { margin-left: auto; }
   .content-form { padding: 1.2rem 1.15rem 1.35rem; }
-  .note-editor-form #note-summary { height: min(42dvh, 380px); min-height: 220px; max-height: 380px; }
-  .latex-preview { height: min(32dvh, 300px); min-height: 190px; max-height: 300px; }
+  .note-editor-form #note-workbench-root { min-width: 0; }
   .note-filters { display: grid; grid-template-columns: 1fr; padding: 1rem 1.15rem; }
   .note-filters select { width: 100%; }
   .editor-actions { flex-direction: column-reverse; }
@@ -315,4 +269,3 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 }
 @media (max-width: 380px) { nav { gap: .75rem; font-size: .8rem; } .brand { font-size: 1rem; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition-duration: .01ms !important; } }
-

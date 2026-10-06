@@ -36,4 +36,3 @@ export function setupTagPicker(root,available) {
   render();
   return {get:()=>[...selected],set:tags=>{selected.clear();tags.forEach(tag=>{selected.add(tag);known.add(tag);});render();root.dispatchEvent(new Event('change',{bubbles:true}));}};
 }
-
