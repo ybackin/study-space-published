@@ -37,6 +37,9 @@ async function typeset(record) {
     const output = await api.tex2svgPromise(record.latex, {display:record.displayMode});
     if (serial !== record.serial) return;
     record.element.replaceChildren(output);
+    // Direct conversion does not run page typesetting. Ask MathJax to install
+    // its own page stylesheet, including visually hidden assistive MathML.
+    api.startup.document.updateDocument();
     record.element.dataset.renderedLatex = record.latex;
     record.element.dataset.renderCount = String(Number(record.element.dataset.renderCount || 0) + 1);
   } catch (error) {
