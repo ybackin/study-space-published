@@ -160,7 +160,8 @@ footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3
 .latex-workbench > div + div { margin-top: 1.25rem; }
 .latex-preview { width: 100%; height: min(45dvh, 480px); min-height: 220px; max-height: 480px; overflow-y: auto; overflow-x: auto; padding: .8rem 1rem; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-strong); color: var(--text); font-size: 18px; line-height: 1.72; text-align: left; }
 .preview-placeholder { color: var(--muted-dim); font-size: .86rem; }
-.preview-line { display: block; min-height: 1.72em; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.72; }
+.preview-line { display: block; min-height: 1.72em; line-height: 1.72; }
+.preview-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .inline-formula { display: inline-block; white-space: normal; vertical-align: baseline; }
 .formula-block { display: block; width: 100%; margin: .35em 0; overflow-x: auto; text-align: center; }
 .inline-formula, .formula-block { cursor: pointer; border-radius: 3px; }
