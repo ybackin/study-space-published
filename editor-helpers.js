@@ -1,3 +1,4 @@
+import {createPopover} from './popover.js';
 // Only a standalone backslash starts completion. Consecutive slashes are line breaks.
 export function commandToken(source, cursor=source.length) {
   const match=source.slice(0,cursor).match(/(\\+)([A-Za-z]*)$/);
@@ -14,7 +15,8 @@ export function setupTagPicker(root,available) {
   const known=new Set(['数学','英语',...available]),selected=new Set();
   root.innerHTML='<label for="tag-search">标签</label><div class="tag-chips" id="selected-tags" aria-label="已选标签"></div><div class="tag-search-row"><input id="tag-search" type="search" maxlength="40" autocomplete="off" placeholder="搜索或创建标签" aria-controls="tag-options"><button type="button" class="secondary-link" id="tag-toggle" aria-expanded="false" aria-controls="tag-options">选择标签</button></div><div id="tag-options" class="tag-options" hidden></div><p class="field-hint" id="tag-message" role="status">可多选；输入新标签后按 Enter 创建。</p>';
   const search=root.querySelector('input'),chips=root.querySelector('.tag-chips'),options=root.querySelector('.tag-options'),toggle=root.querySelector('#tag-toggle'),message=root.querySelector('#tag-message');
-  const setOpen=value=>{options.hidden=!value;toggle.setAttribute('aria-expanded',String(value));};
+  const popover=createPopover({panel:options,triggers:()=>[root],onOpen:()=>{options.hidden=false;toggle.setAttribute('aria-expanded','true');},onClose:()=>{options.hidden=true;toggle.setAttribute('aria-expanded','false');}});
+  const setOpen=value=>value?popover.open():popover.close();
   const choose=tag=>{
     if(selected.size>=12){message.textContent='每篇笔记最多选择 12 个标签。';return;}
     selected.add(tag);known.add(tag);search.value='';message.textContent='已添加标签。';render();root.dispatchEvent(new Event('change',{bubbles:true}));search.focus();
@@ -31,7 +33,6 @@ export function setupTagPicker(root,available) {
   search.addEventListener('input',()=>{render();setOpen(true);});
   search.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();const query=search.value.trim();if(query)choose([...known].find(t=>t.toLocaleLowerCase()===query.toLocaleLowerCase())||query);}else if(event.key==='Escape'){setOpen(false);}});
   toggle.addEventListener('click',()=>{render();setOpen(options.hidden);});
-  root.addEventListener('focusout',event=>{if(!root.contains(event.relatedTarget))setOpen(false);});
   root.closest('form').addEventListener('reset',()=>{selected.clear();search.value='';render();setOpen(false);root.dispatchEvent(new Event('change',{bubbles:true}));});
   render();
   return {get:()=>[...selected],set:tags=>{selected.clear();tags.forEach(tag=>{selected.add(tag);known.add(tag);});render();root.dispatchEvent(new Event('change',{bubbles:true}));}};
