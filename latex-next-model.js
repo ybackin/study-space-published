@@ -34,10 +34,17 @@ function readRun(source, start) {
       !asciiLetter(source[start]) && !digit(source[start])) return start;
   let cursor = start, curly = 0, square = 0;
   let sawMath = source[start] === '\\', sawCommand = false;
+  let closedGroup = false, scriptPending = false, completedScript = false;
+  const openingCommand = source[start] === '\\' ? source.slice(start+1).match(/^[A-Za-z]+/)?.[0] : '';
+  const integral = ['int','iint','iiint','oint'].includes(openingCommand);
   while (cursor < source.length) {
     const char = source[cursor];
     if (char === '\n' || char === '\r' || cjk(char)) break;
     if (source.startsWith('\\\\', cursor)) break;
+    if (!curly && !square && (asciiLetter(char) || digit(char))) {
+      if (!integral && (closedGroup || completedScript && !digit(char))) break;
+      if (integral && cursor>start+2 && source[cursor-2]==='d' && asciiLetter(source[cursor-1])) break;
+    }
     if (char === '\\') {
       if (!asciiLetter(source[cursor + 1])) {
         if (',;:! {}%$&#_^'.includes(source[cursor + 1] || '\0')) {cursor += 2; continue;}
@@ -46,10 +53,12 @@ function readRun(source, start) {
       cursor += 2;
       while (asciiLetter(source[cursor])) cursor++;
       sawCommand = sawMath = true;
+      closedGroup = false;
+      if (scriptPending) {scriptPending=false;completedScript=true;}
       continue;
     }
-    if (char === '{') { curly++; cursor++; continue; }
-    if (char === '}') { if (curly === 0) break; curly--; cursor++; continue; }
+    if (char === '{') { curly++; closedGroup=false;scriptPending=false;completedScript=false;cursor++; continue; }
+    if (char === '}') { if (curly === 0) break; curly--;closedGroup=curly===0;cursor++; continue; }
     if (char === '[') { square++; cursor++; continue; }
     if (char === ']') { if (square === 0) break; square--; cursor++; continue; }
     if (whitespace(char)) {
@@ -62,13 +71,18 @@ function readRun(source, start) {
       const followsMath = right === '\\' && asciiLetter(source[next + 1]) ||
         mathPunctuation(right) ||
         sawCommand && (asciiLetter(right) || digit(right)) &&
-          (source.slice(start, cursor).includes('\\int') || source.slice(start, cursor).includes('\\iint') ||
+          (integral ||
            mathPunctuation(left) && '=+*/<>-'.includes(left));
       if (followsMath) { cursor = next; continue; }
       break;
     }
     if (asciiLetter(char) || digit(char) || mathPunctuation(char)) {
       if ('_^=<>'.includes(char)) sawMath = true;
+      if (!curly && !square) {
+        if (char==='_' || char==='^') {scriptPending=true;completedScript=false;closedGroup=false;}
+        else if (scriptPending) {scriptPending=false;completedScript=true;}
+        else if (mathPunctuation(char)) {closedGroup=false;completedScript=false;}
+      }
       cursor++;
       continue;
     }
