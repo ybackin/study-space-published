@@ -48,20 +48,44 @@ export function colorRange(marks,from,to,color) {
   if(color!=='default')next.push({from,to,color});
   return next.sort((a,b)=>a.from-b.from);
 }
-function mathLike(value) {
-  // A mathematical line remains in the normal note flow; this only chooses its inline content.
-  return !/[\u3400-\u9fff]/.test(value) && (/\\[A-Za-z]+/.test(value) || /[A-Za-z0-9)]\s*[_^=<>]\s*[A-Za-z0-9({\\]/.test(value));
-}
 const displayEnvironment=/^\\begin\{(?:align|aligned|alignat|cases|dcases|rcases|pmatrix|bmatrix|vmatrix|Vmatrix|matrix|array|gather|gathered|split|equation|multline)\}/;
+function environmentAt(source,start) {
+  if(!source.startsWith('\\begin{',start))return null;
+  const nameEnd=source.indexOf('}',start+7);
+  if(nameEnd<0)return null;
+  const name=source.slice(start+7,nameEnd);
+  if(!/^[A-Za-z*]+$/.test(name))return null;
+  const open='\\begin{'+name+'}',close='\\end{'+name+'}';
+  let depth=1,index=nameEnd+1;
+  while(index<source.length){
+    if(source.startsWith(open,index)){depth++;index+=open.length;continue;}
+    if(source.startsWith(close,index)){depth--;index+=close.length;if(depth===0)return {end:index,display:displayEnvironment.test(open)};continue;}
+    index++;
+  }
+  return null;
+}
 const cleanInvalidSlashes=source=>source.replace(/(?<!\\)\\(?![A-Za-z\\{}\[\]()%$&#_^ ,;:!])/g,'');
 function mathRunEnd(source,start) {
   if(!/[A-Za-z]/.test(source[start]||'')&&!(source[start]==='\\'&&/[A-Za-z]/.test(source[start+1]||'')))return start;
   let end=start,braces=0;
+  const integral=/^\\(?:int|iint|iiint|oint)(?![A-Za-z])/.test(source.slice(start));
   while(end<source.length){
     const char=source[end];
+    if(braces===0&&end>start&&/[A-Za-z0-9]/.test(char)){
+      const before=source.slice(start,end);
+      if(source[end-1]==='}'&&!integral)break;
+      if(/\^\*$/.test(before))break;
+      if(integral&&/d[A-Za-z]$/.test(before))break;
+    }
     if(char==='{' ) braces++;
     else if(char==='}') {if(!braces)break;braces--;}
-    else if(char===' '&&braces===0)break;
+    else if(char===' '&&braces===0){
+      let next=end;while(source[next]===' ')next++;
+      const before=source.slice(start,end),following=source[next]||'';
+      if(following&&/[^\x00-\x7F]/.test(following))break;
+      if(/[=+*/<>-]$/.test(before)||/[=+*/<>-]/.test(following)||(integral&&!/[A-Za-z]/.test(before.slice(before.lastIndexOf('}')+1))&&/[A-Za-z\\]/.test(following))){end=next;continue;}
+      break;
+    }
     else if(!/[A-Za-z0-9\\_^=+*/<>()[\].,-]/.test(char)&&char!==' ')break;
     end++;
   }
@@ -84,6 +108,22 @@ function inlineNodes(source,from) {
 }
 export function blocks(source) {
   const result=[];let offset=0;
+  const addSegment=(segment,from)=>{
+    result.push({type:'line',children:inlineNodes(segment,from),from,to:from+segment.length});
+  };
+  const addPart=(part,from)=>{
+    const clean=cleanInvalidSlashes(part);let index=0,start=0,found=false;
+    while(index<clean.length){
+      const environment=environmentAt(clean,index);
+      if(!environment){index++;continue;}
+      if(index>start)addSegment(clean.slice(start,index),from+start);
+      const latex=clean.slice(index,environment.end),begin=from+index,end=from+environment.end;
+      if(environment.display)result.push({type:'blockMath',source:latex,from:begin,to:end});
+      else result.push({type:'line',children:[{type:'inlineMath',source:latex,from:begin,to:end}],from:begin,to:end});
+      index=environment.end;start=index;found=true;
+    }
+    if(start<clean.length||!found)addSegment(clean.slice(start),from+start);
+  };
   for(const raw of source.split('\n')) {
     const parts=[];let start=0,environment=false;
     for(let i=0;i<raw.length;i++) {
@@ -104,16 +144,7 @@ export function blocks(source) {
     if(start<raw.length||!parts.length)parts.push({source:raw.slice(start),from:offset+start});
     for(const part of parts) {
       if(part.break){result.push({type:'break'});continue;}
-      const clean=cleanInvalidSlashes(part.source),trimmed=clean.trim();
-      if(trimmed&&displayEnvironment.test(trimmed))result.push({type:'blockMath',source:trimmed,from:part.from,to:part.from+part.source.length});
-      else if(trimmed&&mathLike(trimmed)){
-        const leading=clean.indexOf(trimmed);
-        const children=[];
-        if(leading>0)children.push({type:'text',source:clean.slice(0,leading),from:part.from,to:part.from+leading});
-        children.push({type:'inlineMath',source:trimmed,from:part.from+leading,to:part.from+leading+trimmed.length});
-        if(leading+trimmed.length<clean.length)children.push({type:'text',source:clean.slice(leading+trimmed.length),from:part.from+leading+trimmed.length,to:part.from+clean.length});
-        result.push({type:'line',children,from:part.from,to:part.from+part.source.length});
-      } else result.push({type:'line',children:inlineNodes(clean,part.from),from:part.from,to:part.from+part.source.length});
+      addPart(part.source,part.from);
     }
     result.push({type:'break'});offset+=raw.length+1;
   }
